@@ -1,0 +1,42 @@
+jarvis_backend/
+│
+├── .env
+├── requirements.txt
+├── README.md
+├── main.py                   # Entry point (or you may name it app/main.py)
+│
+├── app/
+│   ├── __init__.py
+│   ├── main.py               # Instantiates FastAPI app, includes routers
+│   ├── config.py             # Settings / env loader
+│   ├── routes/               # All API endpoint files
+│   │   ├── __init__.py
+│   │   ├── chat.py           # Chat endpoint(s)
+│   │   ├── translate.py      # Translation endpoint
+│   │   └── tts.py            # Text-to-speech endpoint
+│   │
+│   ├── models/               # Domain models (Pydantic schemas, maybe DB models)
+│   │   ├── __init__.py
+│   │   ├── chat_schema.py
+│   │   ├── translate_schema.py
+│   │   └── tts_schema.py
+│   │
+│   ├── services/             # Business logic (model inference, translation, TTS)
+│   │   ├── __init__.py
+│   │   ├── chat_service.py
+│   │   ├── translate_service.py
+│   │   └── tts_service.py
+│   │
+│   ├── utils/                # Utility helpers
+│   │   ├── __init__.py
+│   │   ├── model_loader.py   # Load LLM/model
+│   │   ├── translator.py     # Translation util
+│   │   └── tts_helper.py     # TTS util
+│   │
+│   └── dependencies.py       # Any shared dependencies (e.g., model session, DB)
+│
+└── tests/                     # Test files for your endpoints/services
+    ├── __init__.py
+    ├── test_chat.py
+    ├── test_translate.py
+    └── test_tts.py
