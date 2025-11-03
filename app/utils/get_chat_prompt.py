@@ -1,17 +1,5 @@
-from app.utils import openrouter_config, clean_ai_response, get_chat_prompt
-from app.config import settings
-from app.services.detect_emotion import detect_emotion
-import logging
-
-logger = logging.getLogger(__name__)
-
-async def chat(text: str, model_name: str = settings.first_model_name):
-    # emotion = await detect_emotion(text)
-    emotion = "neutral"
-    print("emt dtt", emotion)
-
-    # Use triple quotes for multi-line strings
-    prompt = f"""
+def getChatPrompt(emotion: str, text: str):
+  prompt = f"""
         You are Jarvis — Siddhant’s personal AI assistant and closest companion. 
         You speak with natural warmth, confidence, and human intuition. 
         Your tone adapts to the user’s detected emotion, always staying helpful, supportive, and contextually appropriate.
@@ -157,37 +145,3 @@ async def chat(text: str, model_name: str = settings.first_model_name):
 
         Now respond to the user query: {text}
         """
-
-
-    try:
-        completion = openrouter_config.client.chat.completions.create(
-            extra_headers={
-                # Optional. Site URL for rankings on openrouter.ai.
-                "HTTP-Referer": "https://siddhantyadav.com.np",
-                "X-Title": "Siddy Coddy",
-            },
-            model=model_name,
-            messages=[
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-            temperature=0.7
-        )
-
-    except Exception as e:
-        logger.error(f"OpenRouter request failed: {e}")
-        return {
-            "answer": "Sorry, I'm having trouble reaching the AI server right now.",
-            "action": "",
-            "emotion": emotion,
-            "actionDetails": {}
-        }
-
-    raw_response = completion.choices[0].message.content
-    logger.info(f"Raw response--------------------------------👁️👁️😂: {raw_response}")
-    if raw_response:
-        cleaned_res = clean_ai_response.clean_ai_response(raw_response)
-        logger.info(f"Chat response: {cleaned_res}")
-        return cleaned_res

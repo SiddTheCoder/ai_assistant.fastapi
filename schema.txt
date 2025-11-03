@@ -1,4 +1,28 @@
-jarvis_backend/
+1. steps : Components:
+
+User → Emotion detector + Embedding → Memory Manager (Chroma / Pinecone)
+       ↓
+   Context Builder → Prompt Generator → OpenRouter API (Mistral 7B)
+       ↓
+      Response → Stored back to Memory DB for learning
+
+Emotion Detector – you already have it.
+Embedding Engine – to encode all your text, past chats, preferences, etc.
+Vector Database (Memory) – stores “memories” as embeddings with metadata.
+Context Retriever – every new message, retrieves the most relevant memories (like “Siddhant likes deep explanations when learning code”).
+Prompt Composer – combines core prompt + emotion + retrieved memory + new message → sends to Mistral.
+Memory Updater – after each interaction, stores new insights about your personality, phrasing, or patterns.
+
+
+2. How They Work Together in Your Jarvis
+Purpose	Type	Example Data
+Facts / Config	PostgreSQL / MongoDB	User profile, preferences, settings
+Conversations + long-term thoughts	Vector DB	All your chats, notes, behaviors, embeddings
+Short-term memory	In-memory (RAM / Redis)	Current session context
+
+
+
+3. jarvis_backend/
 │
 ├── .env
 ├── requirements.txt
