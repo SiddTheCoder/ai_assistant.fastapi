@@ -5,13 +5,15 @@ import sys
 import time
 import pyautogui
 import logging
+from app.utils.fomat_raw_text import format_raw_text
 
 logger = logging.getLogger(__name__)
 
 # ---------------- Open Notepad function ----------------
 def open_notepad(details):
-  logger.info(f"Opening Notepad...{details}")
-  content = details.get("content", "")
+
+  content = details.answerDetails.content
+  content = format_raw_text(content)
 
   if sys.platform.startswith("win"):
       subprocess.Popen(["notepad"])

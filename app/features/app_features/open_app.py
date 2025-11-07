@@ -11,7 +11,7 @@ def open_app(details):
     Open apps or websites based on simple text commands.
     Works on Windows, macOS, and Linux.
     """
-    command = details.get("app_name", "")
+    command = details.actionDetails.app_name
     command = command.lower().strip()
    
     # --- Common app mappings ---
@@ -65,8 +65,3 @@ def open_app(details):
             return
 
     print("❌ Sorry, I couldn’t find a match for that command.")
-
-# # --- Example usage ---
-# if __name__ == "__main__":
-#     user_input = input("Say what to open: ")
-#     open_app(user_input)

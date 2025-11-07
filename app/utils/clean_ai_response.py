@@ -2,20 +2,96 @@ import json
 import re
 import logging
 from typing import Any
-from app.schemas.chat_schema import ActionDetails, ChatResponse, Confirmation
+from app.schemas.chat_schema import (
+    ActionDetails, 
+    ChatResponse, 
+    Confirmation, 
+    AnswerDetails
+)
 
 logger = logging.getLogger(__name__)
 
 
-def merge_with_schema(data: dict) -> ActionDetails:
-    """Merge raw dict into ActionDetails schema."""
+def clean_ai_response(raw_data: str) -> ChatResponse:
+    """
+    Parse and validate AI response JSON with robust error handling.
+    Handles markdown wrappers, nested JSON, and malformed responses.
+    """
+    try:
+        # Step 1: Remove markdown code blocks
+        raw_data = raw_data.strip()
+        if raw_data.startswith("```"):
+            raw_data = re.sub(r"^```[a-zA-Z]*\n?", "", raw_data)
+            raw_data = raw_data.rstrip("`").strip()
+
+        # Step 2: Parse JSON
+        data: Any = json.loads(raw_data)
+
+        # Step 3: Handle double-encoded JSON (string instead of dict)
+        if isinstance(data, str):
+            logger.warning("Response is double-encoded string, parsing again...")
+            data = json.loads(data)
+
+        # Step 4: Check for nested JSON in 'answer' field (common AI mistake)
+        if "answer" in data and isinstance(data["answer"], str):
+            try:
+                potential_nested = json.loads(data["answer"])
+                if isinstance(potential_nested, dict) and "actionDetails" in potential_nested:
+                    logger.warning("Unwrapping nested JSON from 'answer' field")
+                    data = potential_nested
+            except (json.JSONDecodeError, TypeError):
+                pass  # It's just a normal string answer
+
+        # Step 5: Extract and validate fields
+        answer = data.get("answer", "").strip()
+        if "\\n" in answer:
+            answer = answer.replace("\\n", "\n")
+
+        action = data.get("action", "").strip()
+        emotion = data.get("emotion", "neutral").strip()
+
+        # Step 6: Parse answerDetails with defaults
+        answer_details_data = data.get("answerDetails", {})
+        answer_details = AnswerDetails(
+            content=answer_details_data.get("content", ""),
+            sources=answer_details_data.get("sources", []),
+            references=answer_details_data.get("references", []),
+            additional_info=answer_details_data.get("additional_info", {})
+        )
+
+        # Step 7: Parse actionDetails with schema validation
+        action_details_data = data.get("actionDetails", {})
+        action_details = _parse_action_details(action_details_data)
+
+        # Step 8: Create validated response
+        cleaned = ChatResponse(
+            answer=answer,
+            action=action,
+            emotion=emotion,
+            answerDetails=answer_details,
+            actionDetails=action_details
+        )
+
+        logger.info(f"Successfully cleaned response: answer_length={len(answer)}, action={action}, emotion={emotion}")
+        return cleaned
+
+    except (json.JSONDecodeError, AttributeError, TypeError, KeyError) as e:
+        logger.error(f"Failed to parse AI response: {e}", exc_info=True)
+        logger.debug(f"Raw data causing error: {raw_data[:500]}...")
+        
+        # Return fallback with raw data as answer
+        return _create_fallback_response(raw_data)
+
+
+def _parse_action_details(data: dict) -> ActionDetails:
+    """Parse and validate actionDetails with nested confirmation."""
     confirmation_data = data.get("confirmation", {})
-    confirmation_obj = Confirmation(
+    confirmation = Confirmation(
         isConfirmed=confirmation_data.get("isConfirmed", False),
         actionRegardingQuestion=confirmation_data.get("actionRegardingQuestion", "")
     )
 
-    action_details = ActionDetails(
+    return ActionDetails(
         type=data.get("type", ""),
         query=data.get("query", ""),
         title=data.get("title", ""),
@@ -25,68 +101,24 @@ def merge_with_schema(data: dict) -> ActionDetails:
         app_name=data.get("app_name", ""),
         target=data.get("target", ""),
         location=data.get("location", ""),
-        confirmation=confirmation_obj,
+        confirmation=confirmation,
         additional_info=data.get("additional_info", {})
     )
-    return action_details
 
 
-def clean_ai_response(raw_data: str) -> ChatResponse:
-    """
-    Lightweight wrapper to parse AI response JSON.
-    Only cleans/unwraps if the response is malformed.
-    If response is clean, just formats newlines in the answer.
-    """
-    try:
-        # Remove markdown fenced blocks if present
-        raw_data = raw_data.strip()
-        if raw_data.startswith("```"):
-            raw_data = re.sub(r"^```[a-zA-Z]*\n?", "", raw_data).rstrip("`").strip()
-
-        # Parse JSON
-        data: Any = json.loads(raw_data)
-
-        # Handle double-encoded JSON (if entire response is a string)
-        if isinstance(data, str):
-            data = json.loads(data)
-
-        # Check if response is malformed (entire JSON nested in "answer" field)
-        if "answer" in data and isinstance(data["answer"], str):
-            try:
-                # Try to parse the answer field as JSON
-                potential_nested = json.loads(data["answer"])
-                # If it has the expected structure, unwrap it
-                if isinstance(potential_nested, dict) and "actionDetails" in potential_nested:
-                    logger.warning("Detected nested JSON in 'answer' field, unwrapping...")
-                    data = potential_nested
-            except (json.JSONDecodeError, TypeError):
-                # Not JSON - it's just a regular string answer, continue normally
-                pass
-
-        # Format answer text (only clean newlines, keep it readable)
-        answer = data.get("answer", "").strip()
-        # Replace literal \n with actual newlines
-        if "\\n" in answer:
-            answer = answer.replace("\\n", "\n")
-
-        # Merge actionDetails with schema
-        action_details = merge_with_schema(data.get("actionDetails", {}))
-
-        cleaned = ChatResponse(
-            answer=answer,
-            action=data.get("action", "").strip(),
-            emotion=data.get("emotion", "neutral").strip(),
-            actionDetails=action_details
-        )
-
-        # Use model_dump() instead of deprecated json() method
-        logger.info(f"Cleaned response: {cleaned.model_dump()}")
-        return cleaned
-
-    except (json.JSONDecodeError, AttributeError, TypeError) as e:
-        logger.error(f"Failed to parse AI response: {e}")
-        # Return fallback response with raw data as answer
-        default_action = ActionDetails(
+def _create_fallback_response(raw_data: str) -> ChatResponse:
+    """Create safe fallback response when parsing fails."""
+    return ChatResponse(
+        answer=raw_data.strip() if raw_data else "Sorry, I couldn't process that response.",
+        action="",
+        emotion="neutral",
+        answerDetails=AnswerDetails(
+            content="",
+            sources=[],
+            references=[],
+            additional_info={}
+        ),
+        actionDetails=ActionDetails(
             type="",
             query="",
             title="",
@@ -99,23 +131,4 @@ def clean_ai_response(raw_data: str) -> ChatResponse:
             confirmation=Confirmation(isConfirmed=False, actionRegardingQuestion=""),
             additional_info={}
         )
-        return ChatResponse(
-            answer=raw_data.strip(),
-            action="",
-            emotion="neutral",
-            actionDetails=default_action
-        )
-
-
-ACTION_DETAILS_SCHEMA = {
-    "type": "",             # core action category (e.g., "play_song", "search", "open_app", "navigate", "message", "control_device")
-    "query": "",            # raw query string / parsed phrase
-    "title": "",            # for content titles (song, video, note, etc.)
-    "artist": "",           # for music
-    "topic": "",            # for search/news/weather
-    "platforms": [],        # prioritized array like ["youtube", "musicplayer", "spotify"]
-    "app_name": "",         # if opening or interacting with an app
-    "target": "",           # recipient (for messages, reminders, calls)
-    "location": "",         # for map/weather-based actions
-    "additional_info": {},  # flexible dict for extension
-}
+    )
