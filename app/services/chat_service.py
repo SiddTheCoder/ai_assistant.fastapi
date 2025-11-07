@@ -40,7 +40,8 @@ async def chat(text: str, model_name: str = settings.first_model_name):
 
         Task behavior:
         - Answer Siddhant’s request naturally and helpfully.
-        - Optionally generate a short, relevant system “action command” (like "search weather trends", "open notes") if applicable.
+        - **If a verbal response is sufficient and no system action is necessary, leave the "action" key empty.**
+        - Optionally generate a short, relevant system “action command” (like "search weather trends", "open notes") only if the user explicitly asks for a system task.
         - For sensitive or unclear actions, generate a confirmation object:
             * "isConfirmed": true if AI is confident the action should proceed immediately.
             * "isConfirmed": false if AI is uncertain or action may require user approval.
@@ -52,11 +53,11 @@ async def chat(text: str, model_name: str = settings.first_model_name):
         - The response should start with {{ "answer": ..., not with {{ "answer": "{{ ... }}" }}
         - JSON must include:
             - "answer": your emotionally appropriate, natural response.
-            - "action": concise natural command (or empty if none fits).
+            - "action": concise natural command & it is for external(either system or even external work) (or empty if none is needed for verbal response).
             - "emotion": the detected emotion.
             - "actionDetails": structured breakdown of the action using the following fixed schema:
                 {{
-                    "type": "",              # e.g. "play_song", "search", "open_app", "navigate", "message"
+                    "type": "",   (e.g., "play_song", "make_call", "message", "search", "open_app", or "" if none)           
                     "query": "",             
                     "title": "",
                     "artist": "",
@@ -74,8 +75,33 @@ async def chat(text: str, model_name: str = settings.first_model_name):
 
         Examples:
 
-            Example 1:
-            User: "play song Lover by Taylor Swift"
+            Example 1 (verbal only):
+            User: "How are you today?"
+            Output:
+            {{
+                "answer": "I'm doing great, Siddhant! How about you?",
+                "action": "",
+                "emotion": "neutral",
+                "actionDetails": {{
+                    "type": "",
+                    "query": "",
+                    "title": "",
+                    "artist": "",
+                    "topic": "",
+                    "platforms": [],
+                    "app_name": "",
+                    "target": "",
+                    "location": "",
+                    "confirmation": {{
+                        "isConfirmed": false,
+                        "actionRegardingQuestion": ""
+                    }},
+                    "additional_info": {{}}
+                }}
+            }}
+
+            Example 2 (system action):
+            User: "Play song Lover by Taylor Swift"
             Output:
             {{
                 "answer": "Sure, playing Lover by Taylor Swift.",
@@ -99,60 +125,35 @@ async def chat(text: str, model_name: str = settings.first_model_name):
                 }}
             }}
 
-            Example 2 (requires confirmation):
-            User: "open notepad and write a poem"
-            Output:
+            Example 3 (if you are sufficient for performing the action on your own then make the action value empty as"" ):
+            User: "convert the 'param devi yadav' into nepali written text"
+            Output: 
             {{
-                "answer": "I'd be happy to help you with that. Opening notepad and getting started on a poem for you.",
-                "action": "open notepad and write a poem",
+               "answer": "The name 'Param Devi Yadav' in Nepali written text is परम देवी यादव. I've converted it for you, Siddhant.",
+                "action": "convert text to Nepali",
                 "emotion": "neutral",
                 "actionDetails": {{
-                    "type": "open_app",
-                    "query": "notepad",
-                    "title": "",
-                    "artist": "",
-                    "topic": "poetry",
-                    "platforms": [],
-                    "app_name": "notepad",
-                    "target": "",
-                    "location": "",
-                    "confirmation": {{
-                        "isConfirmed": false,
-                        "actionRegardingQuestion": "Sir, what type of poem would you like me to write? Something specific or a completely new idea?"
-                    }},
-                    "additional_info": {{
-                        "poem_type": "unknown",
-                        "poem_topic": "unknown"
-                    }}
+                    "type": "text_conversion",
+                "query": "Param Devi Yadav",
+                "title": "",
+                "artist": "",
+                "topic": "language_conversion",
+                "platforms": [
+                "google_translate",
+                "language_tools"
+                ],
+                "app_name": "",
+                "target": "Nepali",
+                "location": "",
+                "confirmation": {{
+                    "isConfirmed": true,
+                    "actionRegardingQuestion": ""
+                }},
+                "additional_info": {{
+                    "original_text": "Param Devi Yadav",
+                    "converted_text": "परम देवी यादव"
                 }}
             }}
-
-            Example 3:
-            User: "open WhatsApp and message Kartik like hey I am not coming today"
-            Output:
-            {{
-                "answer": "Okay, opening WhatsApp and sending your message to Kartik.",
-                "action": "send message to Kartik on WhatsApp",
-                "emotion": "neutral",
-                "actionDetails": {{
-                    "type": "message",
-                    "query": "hey I am not coming today",
-                    "title": "",
-                    "artist": "",
-                    "topic": "",
-                    "platforms": ["whatsapp", "telegram", "signal"],
-                    "app_name": "whatsapp",
-                    "target": "Kartik",
-                    "location": "",
-                    "confirmation": {{
-                        "isConfirmed": true,
-                        "actionRegardingQuestion": ""
-                    }},
-                    "additional_info": {{
-                        "message_content": "hey I am not coming today",
-                        "intent": "inform_absence"
-                    }}
-                }}
             }}
 
         Now respond to the user query: {text}
