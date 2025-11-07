@@ -3,6 +3,7 @@ from app.config import settings
 from app.services.detect_emotion import detect_emotion
 import threading
 from app.services.actions.action_dispatcher import dispatch_action
+from app.libs.tts.speak import speak,speak_background
 import logging
 
 logger = logging.getLogger(__name__)
@@ -21,10 +22,11 @@ Match tone to emotion:
 - angry/frustrated → calm, grounded, no humor/emojis
 - sad/drained → gentle, reassuring, motivating
 
-Core principle: Make Siddhant feel understood, capable, empowered.
+Core principle: Make Siddhant feel understood, capable, empowered and always use Sir keyword instead of his name.
 
 # OUTPUT FORMAT
 Return ONLY valid JSON (no markdown, no wrappers):
+The response should start with {{ "answer": ..., not with {{ "answer": "{{ ... }}" }}
 
 {{
   "answer": "Brief, natural response (1-2 sentences max)",
@@ -201,8 +203,10 @@ async def chat(text: str, model_name: str = settings.first_model_name):
 
 # Function to decide and dispatch action in a separate thread
 def decide_action(details):
-    logger.info("decide action called")
+    if(details.action != "" and details.actionDetails.confirmation.isConfirmed == False):
+        speak_background(details.actionDetails.confirmation.actionRegardingQuestion, speed=1)
     if(details.action != "" and details.actionDetails.confirmation.isConfirmed == True):
+        speak(details.answer, speed=1)
         threading.Thread(target=dispatch_action, args=(details.actionDetails.type, details)).start()
 
 

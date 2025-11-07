@@ -2,6 +2,7 @@ import json
 import re
 import logging
 from typing import Any
+from json_repair import repair_json
 from app.schemas.chat_schema import (
     ActionDetails, 
     ChatResponse, 
@@ -24,6 +25,12 @@ def clean_ai_response(raw_data: str) -> ChatResponse:
             raw_data = re.sub(r"^```[a-zA-Z]*\n?", "", raw_data)
             raw_data = raw_data.rstrip("`").strip()
 
+        # Step 1.5: Repair malformed JSON
+        try:
+            raw_data = repair_json(raw_data)
+        except Exception as e:
+            logger.warning(f"JSON repair failed, proceeding with original: {e}")
+
         # Step 2: Parse JSON
         data: Any = json.loads(raw_data)
 
@@ -35,12 +42,22 @@ def clean_ai_response(raw_data: str) -> ChatResponse:
         # Step 4: Check for nested JSON in 'answer' field (common AI mistake)
         if "answer" in data and isinstance(data["answer"], str):
             try:
-                potential_nested = json.loads(data["answer"])
+                # Try to repair nested JSON before parsing
+                answer_str = data["answer"]
+                try:
+                    answer_str = repair_json(answer_str)
+                except Exception:
+                    pass
+                
+                potential_nested = json.loads(answer_str)
                 if isinstance(potential_nested, dict) and "actionDetails" in potential_nested:
                     logger.warning("Unwrapping nested JSON from 'answer' field")
                     data = potential_nested
-            except (json.JSONDecodeError, TypeError):
+            except json.JSONDecodeError as je:
+                logger.warning(f"Nested JSON in 'answer' is malformed: {je}")
                 pass  # It's just a normal string answer
+            except TypeError:
+                pass
 
         # Step 5: Extract and validate fields
         answer = data.get("answer", "").strip()
