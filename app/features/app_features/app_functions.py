@@ -1,5 +1,3 @@
-import os
-import webbrowser
 import subprocess
 import sys
 import time
@@ -26,6 +24,3 @@ def open_notepad(details):
       time.sleep(1.5)
       if content:
           pyautogui.typewrite(content, interval=0.05)
-
-
-# ---------------- Open App function ----------------

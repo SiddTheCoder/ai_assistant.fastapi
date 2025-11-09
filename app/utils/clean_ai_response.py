@@ -18,6 +18,7 @@ def clean_ai_response(raw_data: str) -> ChatResponse:
     Parse and validate AI response JSON with robust error handling.
     Handles markdown wrappers, nested JSON, and malformed responses.
     """
+
     try:
         # Step 1: Remove markdown code blocks
         raw_data = raw_data.strip()
@@ -80,6 +81,11 @@ def clean_ai_response(raw_data: str) -> ChatResponse:
         action_details_data = data.get("actionDetails", {})
         action_details = _parse_action_details(action_details_data)
 
+        # Step 7.5: Add searchResults to actionDetails if available
+        if "searchResults" in action_details_data:
+            search_results = action_details_data.get("searchResults", [])
+            action_details.searchResults = search_results
+
         # Step 8: Create validated response
         cleaned = ChatResponse(
             answer=answer,
@@ -119,6 +125,7 @@ def _parse_action_details(data: dict) -> ActionDetails:
         target=data.get("target", ""),
         location=data.get("location", ""),
         confirmation=confirmation,
+        searchResults=data.get("searchResults", []),
         additional_info=data.get("additional_info", {})
     )
 
@@ -145,6 +152,7 @@ def _create_fallback_response(raw_data: str) -> ChatResponse:
             app_name="",
             target="",
             location="",
+            searchResults=[],
             confirmation=Confirmation(isConfirmed=False, actionRegardingQuestion=""),
             additional_info={}
         )

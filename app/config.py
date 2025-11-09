@@ -6,7 +6,10 @@ class Settings(BaseSettings):
     second_model_name: str 
     port : int
     default_lang: str = "en"
-
+    pinecone_api_key: str
+    pinecone_env: str
+    pinecone_index_name: str
+    pinecone_metadata_namespace: str
     class Config:
         env_file = ".env"
         extra = "ignore"

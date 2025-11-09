@@ -22,6 +22,7 @@ class ActionDetails(BaseModel):
     app_name: str = ""
     target: str = ""
     location: str = ""
+    searchResults: List[Dict] = Field(default_factory=list)
     confirmation: Confirmation = Field(default_factory=Confirmation)
     additional_info: Dict = Field(default_factory=dict)
 
