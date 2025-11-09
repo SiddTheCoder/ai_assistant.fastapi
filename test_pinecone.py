@@ -1,6 +1,6 @@
 from app.db.pinecone.config import (
     upsert_query, 
-    get_all_user_queries, 
+    get_user_all_queries, 
     search_user_queries,
     get_index_stats
 )
@@ -20,7 +20,7 @@ def test_upsert():
 
 
 def test_get_all():
-    queries = get_all_user_queries("user_1")
+    queries = get_user_all_queries("user_1")
     print(f"\nAll queries for user_1 {queries} found):")
     
 

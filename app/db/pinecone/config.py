@@ -4,7 +4,6 @@ from pinecone import (
     CloudProvider,
     AwsRegion,
     Metric,
-    SearchQuery
 )
 from app.config import settings
 from typing import Optional, Dict, Any, List
@@ -67,12 +66,10 @@ def upsert_query(user_id: str, query: str) -> None:
     Uses stable ID so duplicate queries update instead of creating new records.
     """
     record_id = generate_stable_id(user_id, query)
-    print(f"Stable ID generated for {user_id}: '{query[:50]}...' (ID: {record_id}...)")
     
     try:
         # Get embedding for the query
         embedding = get_embedding(query)
-        print(f"Embedding obtained for query: '{query}...'")
         
         # Upsert with metadata (traditional method)
         pinecone_index.upsert(
@@ -82,7 +79,8 @@ def upsert_query(user_id: str, query: str) -> None:
                     "values": embedding,
                     "metadata": {
                         "user_id": user_id,
-                        "query": query
+                        "query": query,
+                        "timestamp": time.time()
                     }
                 }
             ],
@@ -90,7 +88,7 @@ def upsert_query(user_id: str, query: str) -> None:
         )
         print(f"✅ Upserted query for {user_id}: '{query[:50]}...' (ID: {record_id[:8]}...)")
     except Exception as e:
-        print(f"❌ Upsert failed: {e}")
+        print(f"[pinecone] Upsert failed: {e}")
 
 
 def search_user_queries(user_id: str, search_text: str, top_k: int = 10) -> List[Dict[str, Any]]:
@@ -111,6 +109,8 @@ def search_user_queries(user_id: str, search_text: str, top_k: int = 10) -> List
         )
         
         # Type assertion to fix type checking
+        """ getattr used to avoid type checking issues like 'QueryResults' has no attribute 'matches'  then  fall back to [] 
+        """
         matches = getattr(results, 'matches', [])
         
         return [
@@ -118,7 +118,9 @@ def search_user_queries(user_id: str, search_text: str, top_k: int = 10) -> List
                 "id": match.id,
                 "score": match.score,
                 "query": match.metadata.get("query", "") if match.metadata else "",
-                "user_id": match.metadata.get("user_id", "") if match.metadata else ""
+                "user_id": match.metadata.get("user_id", "") if match.metadata else "",
+                "timestamp": match.metadata.get("timestamp", 0) if match.metadata else 0
+                # Add more metadata as needed
             }
             for match in matches
         ]
@@ -127,7 +129,7 @@ def search_user_queries(user_id: str, search_text: str, top_k: int = 10) -> List
         return []
 
 
-def get_all_user_queries(user_id: str, top_k: int = 100) -> List[str]:
+def get_user_all_queries(user_id: str, top_k: int = 100) -> List[str]:
     """
     Get all queries for a specific user.
     Uses a generic search term to retrieve all records.
@@ -176,7 +178,7 @@ def delete_user_query(user_id: str, query: str) -> bool:
         return False
 
 
-def delete_all_user_queries(user_id: str) -> bool:
+def delete_user_all_queries(user_id: str) -> bool:
     """
     Delete all queries for a specific user.
     """
