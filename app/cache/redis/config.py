@@ -5,7 +5,6 @@ from datetime import datetime
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
-from app.utils.build_prompt import format_context
 
 redis_client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
 
@@ -181,7 +180,7 @@ def _simple_overlap_similarity(query: str, context: str) -> float:
     overlap = query_words.intersection(context_words)
     return len(overlap) / len(query_words)
 
-# ============ USAGE EXAMPLE ============
+# ============ USAGE ============
 
 def process_query_and_get_context(user_id: str, current_query: str, 
                                       pinecone_search_func, 
@@ -197,10 +196,12 @@ def process_query_and_get_context(user_id: str, current_query: str,
     
     # If Redis context is empty, fetch from Pinecone
     if not local_context:
+        #TODO WebSocket emit a message as loading your memory
         local_context = pinecone_get_func(user_id) # Fetch from Pinecone
         for context in local_context:
             add_message(user_id, "user", context.get("query", ""))
         is_pinecone_needed = True
+        _append_message_to_local_and_cloud(user_id, current_query)
         return local_context, is_pinecone_needed
 
     # Step 2: Compute similarity with recent context
@@ -212,28 +213,14 @@ def process_query_and_get_context(user_id: str, current_query: str,
     if is_pinecone_needed:
         print("[Debug] Low similarity - fetching from Pinecone")
         query_based_context = pinecone_search_func(user_id, current_query)
+        _append_message_to_local_and_cloud(user_id, current_query)
         return query_based_context, is_pinecone_needed
     else:
         print("[Debug] High similarity - using only Redis context")
+        _append_message_to_local_and_cloud(user_id, current_query)
         return local_context, is_pinecone_needed
-   
 
-def build_prompt(current_query: str, context: List[Dict[str, str]]) -> str:
-    """
-    Build a prompt with context for the LLM.
-    
-    Args:
-        current_query: Current user query
-        context: List of context messages
-        
-    Returns:
-        Formatted prompt string
-    """
-    prompt = "Previous conversation:\n"
-    for msg in context:
-        role = msg.get("role", "unknown")
-        content = msg.get("content", "")
-        prompt += f"{role.capitalize()}: {content}\n"
-    
-    prompt += f"\nCurrent query: {current_query}\n\nResponse:"
-    return prompt
+def _append_message_to_local_and_cloud(user_id, current_query):
+    add_message(user_id, "user", current_query)
+    from app.db.pinecone.config import upsert_query
+    upsert_query(user_id, current_query)

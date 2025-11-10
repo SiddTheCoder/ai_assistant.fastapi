@@ -30,7 +30,7 @@ from app.db.pinecone.config import (
 # for t in q:
 #   add_message("user_1", "user", t["query"])
 
-messages = get_last_n_messages("user_1",)
+messages = get_last_n_messages("user_1")
 print("Last n Messages:", json.dumps(messages, indent=2))
 
 # mess  = "I loved her so much ankita"
@@ -40,7 +40,8 @@ print("Last n Messages:", json.dumps(messages, indent=2))
 
 
 
-# # context, state = process_query_and_get_context("user_1", "I loved her so much ankita", search_user_queries, get_user_all_queries, 0.3)
+# context, state = process_query_and_get_context("user_1", "I loved her so much ankita", search_user_queries, get_user_all_queries, 0.3)
+
 # context, state = process_query_and_get_context(
 #   "user_1", 
 #   "I loved her so much ankita", 
