@@ -9,6 +9,7 @@ from app.config import settings
 from typing import Optional, Dict, Any, List
 import hashlib
 import time
+from datetime import datetime
 
 pinecone_client = Pinecone(api_key=settings.pinecone_api_key)
 
@@ -80,7 +81,7 @@ def upsert_query(user_id: str, query: str) -> None:
                     "metadata": {
                         "user_id": user_id,
                         "query": query,
-                        "timestamp": time.time()
+                        "timestamp": datetime.utcnow().isoformat()
                     }
                 }
             ],
@@ -129,7 +130,7 @@ def search_user_queries(user_id: str, search_text: str, top_k: int = 10) -> List
         return []
 
 
-def get_user_all_queries(user_id: str, top_k: int = 100) -> List[str]:
+def get_user_all_queries(user_id: str, top_k: int = 100) -> List[Dict[str, str]]:
     """
     Get all queries for a specific user.
     Uses a generic search term to retrieve all records.
@@ -149,13 +150,22 @@ def get_user_all_queries(user_id: str, top_k: int = 100) -> List[str]:
         
         # Type assertion to fix type checking
         matches = getattr(results, 'matches', [])
+
+        extrcted_data = []
         
-        queries = [
-            match.metadata.get("query", "") 
-            for match in matches 
-            if match.metadata and match.metadata.get("query")
-        ]
-        return queries
+        for match in matches:
+            if match.metadata:
+                item = {
+                    'query': match.metadata.get('query', ''),
+                    'timestamp': match.metadata.get('timestamp', 0),
+                    'user_id': match.metadata.get('user_id', ''),
+                    'score': match.score if hasattr(match, 'score') else 0.0,
+                    'id': match.id if hasattr(match, 'id') else ''
+                }
+
+                extrcted_data.append(item)
+
+        return extrcted_data
     except Exception as e:
         print(f"❌ Failed to get queries: {e}")
         return []
