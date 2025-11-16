@@ -20,7 +20,7 @@ def message(details):
 
 # Default handler
 def unknown_action(details):
-    print(f"⚠️ Unknown action type: {details.get('type')}")
+    print(f"⚠️ Unknown action type: {details.actionDetails.type}")
 
 
 # Dispatcher map
@@ -29,7 +29,8 @@ ACTION_MAP = {
     "make_call": make_call,
     "message": message,
     "search": search_web,
-    "open_app": open_app
+    "open_app": open_app,
+    "unknown": unknown_action
 }
 
 
@@ -39,4 +40,7 @@ def dispatch_action(action_type, details):
     based on 'actionDetails.type'.
     """
     handler = ACTION_MAP.get(action_type, unknown_action)
-    handler(details)
+    if(handler != unknown_action):
+        handler(details)
+    else :    
+        unknown_action(details)

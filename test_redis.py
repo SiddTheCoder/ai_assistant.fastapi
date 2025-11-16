@@ -17,7 +17,7 @@ import json
 # set_cache("test_key", cached_value, expire=60)
 
 
-# clear_conversation_history("user_1")
+clear_conversation_history("user_1")
 
 # add_message("user_1", "user", "Hey i loved one girl very much, Her name was ankita.")
 # add_message("user_1", "user", "I thought she would love me as i do . ")

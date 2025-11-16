@@ -2,10 +2,13 @@ import redis
 from redis import exceptions as redis_exceptions
 import json
 from typing import Any, Optional, List, Dict, cast, Union
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
+
+NEPAL_TZ = timezone(timedelta(hours=5, minutes=45))
+
 
 redis_client = redis.Redis(
     host='localhost', port=6379, 
@@ -66,7 +69,7 @@ def add_message(user_id: str, role: str, content: str) -> None:
         message = {
             "role": role,
             "content": content,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(NEPAL_TZ).isoformat()
         }
         redis_client.rpush(key, json.dumps(message))
     except Exception as e:
@@ -93,8 +96,6 @@ def get_last_n_messages(user_id: str, n: int = 20) -> List[Dict[str, str]]:
             return []
         # Convert to list and parse JSON
         messages_list = list(messages_raw) if not isinstance(messages_raw, list) else messages_raw # type: ignore
-        # reverse the list
-        messages_list = messages_list[::-1]
         return [json.loads(msg) for msg in messages_list if msg]
     except redis_exceptions.TimeoutError:
         safe_warn(f"Redis timed out while fetching messages for user '{user_id}'")

@@ -9,7 +9,10 @@ from app.config import settings
 from typing import Optional, Dict, Any, List
 import hashlib
 import time
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+from app.utils.extract_keywords import extract_keywords
+
+NEPAL_TZ = timezone(timedelta(hours=5, minutes=45))
 
 pinecone_client = Pinecone(api_key=settings.pinecone_api_key)
 
@@ -81,7 +84,7 @@ def upsert_query(user_id: str, query: str) -> None:
                     "metadata": {
                         "user_id": user_id,
                         "query": query,
-                        "timestamp": datetime.utcnow().isoformat()
+                        "timestamp": datetime.now(NEPAL_TZ).isoformat()
                     }
                 }
             ],
@@ -97,8 +100,12 @@ def search_user_queries(user_id: str, search_text: str, top_k: int = 10) -> List
     Search for similar queries for a specific user.
     """
     try:
+        # clean the sentence first
+        cleaned_text = extract_keywords(search_text)
+        print(f"cleaed text  for sent $ {search_text} : {cleaned_text}")
+
         # Get embedding for search text
-        embedding = get_embedding(search_text)
+        embedding = get_embedding(cleaned_text)
         
         # Search with filter
         results = pinecone_index.query(

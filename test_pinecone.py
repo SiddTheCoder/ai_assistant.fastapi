@@ -58,6 +58,6 @@ if __name__ == "__main__":
     
     # # # # After data is inserted and indexed:
     # test_get_all()
-    # test_delete_all()
-    test_search()
+    test_delete_all()
+    # test_search()
     # test_stats()

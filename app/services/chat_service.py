@@ -23,15 +23,15 @@ async def chat(query: str, model_name: str = settings.first_model_name, user_id:
     logger.info(f"Query context from chat_service: {json.dumps(query_context, indent=2)}")
 
     # Get Local Context from redis
-    local_context = get_last_n_messages(user_id, n=20)
-    logger.info(f"local context from chat_service: {json.dumps(local_context, indent=2)}")
+    recent_context = get_last_n_messages(user_id, n=20)
 
     # Detect emotion
     # emotion = await detect_emotion(text)
     emotion = "neutral"  
 
     # Build Prompt using context
-    prompt = build_prompt(emotion, query, local_context, query_context)
+    prompt = build_prompt(emotion, query, recent_context, query_context)
+    logger.info(f"Prompt from chat_service -------------------- \n: {prompt}")
 
     # Step 3: Call OpenRouter API
     try:
@@ -80,16 +80,16 @@ async def chat(query: str, model_name: str = settings.first_model_name, user_id:
 def decide_action(details):
     print("inside the decide_action function")
     if(details.action == ""):
-        speak_background(details.answer, speed=1)
-        if(details.answerDetails.content != ""):
-            speak_background(details.answerDetails.content, speed=1)
+        # speak_background(details.answer, speed=1)
+        # if(details.answerDetails.content != ""):
+        #     speak_background(details.answerDetails.content, speed=1)
         return details
     if(details.action != "" and details.actionDetails.confirmation.isConfirmed == False):
-        speak_background(details.actionDetails.confirmation.actionRegardingQuestion, speed=1)
+        # speak_background(details.actionDetails.confirmation.actionRegardingQuestion, speed=1)
         return details
     if(details.action != "" and details.actionDetails.confirmation.isConfirmed == True):
         from app.utils.run_action_in_thread import run_action_in_thread
-        speak_background(details.answer, speed=1)
+        # speak_background(details.answer, speed=1)
         data = run_action_in_thread(details.actionDetails.type, details)
         return data
 
