@@ -1,4 +1,5 @@
 import redis
+from redis import exceptions as redis_exceptions
 import json
 from typing import Any, Optional, List, Dict, cast, Union
 from datetime import datetime
@@ -6,7 +7,13 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 
-redis_client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+redis_client = redis.Redis(
+    host='localhost', port=6379, 
+    db=0, decode_responses=True, 
+    socket_connect_timeout=3, 
+    socket_timeout=3
+    )
+ 
 
 def safe_warn(msg: str) -> None:
     """Print lightweight non-blocking warnings."""
@@ -86,9 +93,18 @@ def get_last_n_messages(user_id: str, n: int = 20) -> List[Dict[str, str]]:
             return []
         # Convert to list and parse JSON
         messages_list = list(messages_raw) if not isinstance(messages_raw, list) else messages_raw # type: ignore
+        # reverse the list
+        messages_list = messages_list[::-1]
         return [json.loads(msg) for msg in messages_list if msg]
+    except redis_exceptions.TimeoutError:
+        safe_warn(f"Redis timed out while fetching messages for user '{user_id}'")
+        return []
+    except redis_exceptions.ConnectionError:
+        safe_warn(f"Cannot connect to Redis for user '{user_id}'")
+        return []
     except Exception as e:
         safe_warn(f"Failed to get messages for user '{user_id}': {e}")
+        return []
         return []
 
 

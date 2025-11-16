@@ -1,11 +1,12 @@
 from app.utils import openrouter_config, clean_ai_response
 from app.config import settings
-from app.services.detect_emotion import detect_emotion
+# from app.services.detect_emotion import detect_emotion
 from app.services.actions.action_dispatcher import dispatch_action
 from app.libs.tts.speak import speak,speak_background
 from app.db.pinecone.config import (get_user_all_queries,search_user_queries)
 from app.cache.redis.config import get_last_n_messages,process_query_and_get_context
 from app.utils.build_prompt import format_context,build_prompt
+import json
 import logging
 
 logger = logging.getLogger(__name__)
@@ -19,12 +20,11 @@ async def chat(query: str, model_name: str = settings.first_model_name, user_id:
     
     # Get context via query
     query_context, is_pinecone_needed = process_query_and_get_context(user_id, query, search_user_queries, get_user_all_queries, threshold=0.2)
-    import json
     logger.info(f"Query context from chat_service: {json.dumps(query_context, indent=2)}")
 
     # Get Local Context from redis
     local_context = get_last_n_messages(user_id, n=20)
-    logger.info(f"Query context from chat_service: {json.dumps(local_context, indent=2)}")
+    logger.info(f"local context from chat_service: {json.dumps(local_context, indent=2)}")
 
     # Detect emotion
     # emotion = await detect_emotion(text)
@@ -78,17 +78,18 @@ async def chat(query: str, model_name: str = settings.first_model_name, user_id:
 #TODO # later on this will only return the res and all action will be handled in the electron local devices
 # Function to decide and dispatch action in a separate thread
 def decide_action(details):
+    print("inside the decide_action function")
     if(details.action == ""):
-        # speak_background(details.answer, speed=1)
-        # if(details.answerDetails.content != ""):
-        #     speak_background(details.answerDetails.content, speed=1)
+        speak_background(details.answer, speed=1)
+        if(details.answerDetails.content != ""):
+            speak_background(details.answerDetails.content, speed=1)
         return details
     if(details.action != "" and details.actionDetails.confirmation.isConfirmed == False):
-        # speak_background(details.actionDetails.confirmation.actionRegardingQuestion, speed=1)
+        speak_background(details.actionDetails.confirmation.actionRegardingQuestion, speed=1)
         return details
     if(details.action != "" and details.actionDetails.confirmation.isConfirmed == True):
         from app.utils.run_action_in_thread import run_action_in_thread
-        # speak_background(details.answer, speed=1)
+        speak_background(details.answer, speed=1)
         data = run_action_in_thread(details.actionDetails.type, details)
         return data
 

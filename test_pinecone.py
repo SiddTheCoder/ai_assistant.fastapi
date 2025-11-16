@@ -21,14 +21,14 @@ def test_upsert():
 
 
 def test_get_all():
-    queries = get_user_all_queries("user_1")
+    queries = get_user_all_queries("user_1", top_k=5)
     print(f"\nAll queries for user_1 {json.dumps(queries, indent=2)} found):")
     
 
 
 def test_search():
-    results = search_user_queries("user_1", "vector is part of math", top_k=5)
-    print(f"\nSearch results for 'machine learning tutorials' {results} found):")
+    results = search_user_queries("user_1", "Ankita was the love of my life", top_k=5)
+    print(f"{json.dumps(results, indent=2)}")
     # for i, result in enumerate(results, 1):
     #     print(f"  {i}. Query: {result['query']}")
     #     print(f"     Score: {result['score']:.4f}")
@@ -57,7 +57,7 @@ if __name__ == "__main__":
     # test_upsert()
     
     # # # # After data is inserted and indexed:
-    test_get_all()
+    # test_get_all()
     # test_delete_all()
-    # test_search()
+    test_search()
     # test_stats()

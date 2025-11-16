@@ -1,6 +1,7 @@
 import logging
 from fastapi import FastAPI
 from app.routes import chat
+# from app.socket.socket_server import socket_app
 
 # Configure root logger before creating app
 logging.basicConfig(
@@ -18,3 +19,6 @@ def read_root():
     return {"message": "Your AI assistant is ready !!!"}
 
 app.include_router(chat.router)
+
+# Mount socket.io under /ws
+# app.mount("/ws", socket_app)

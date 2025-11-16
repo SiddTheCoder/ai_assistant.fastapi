@@ -1,10 +1,10 @@
 from app.cache.redis.config import set_cache, get_cache, delete_cache, clear_cache, add_message, get_last_n_messages, clear_conversation_history,compute_similarity,process_query_and_get_context
 import json
 
-from app.db.pinecone.config import (
-    get_user_all_queries,
-    search_user_queries
-)
+# from app.db.pinecone.config import (
+#     get_user_all_queries,
+#     search_user_queries
+# )
 
 # data = [{"data": 123, "name": "John", "age": 30}, {"data": 456, "name": "Jane", "age": 25}, {"data": 789, "name": "Doe", "age": 40},{"data": 101, "name": "Alice", "age": 28}]
 

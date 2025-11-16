@@ -130,14 +130,14 @@ def search_user_queries(user_id: str, search_text: str, top_k: int = 10) -> List
         return []
 
 
-def get_user_all_queries(user_id: str, top_k: int = 100) -> List[Dict[str, str]]:
+def get_user_all_queries(user_id: str, top_k: int = 20) -> List[Dict[str, str]]:
     """
     Get all queries for a specific user.
     Uses a generic search term to retrieve all records.
     """
     try:
         # Get embedding for generic search
-        embedding = get_embedding("query")
+        embedding = get_embedding("all queries")
         
         # Query with filter
         results = pinecone_index.query(
