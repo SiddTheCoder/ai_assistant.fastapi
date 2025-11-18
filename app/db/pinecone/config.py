@@ -95,7 +95,7 @@ def upsert_query(user_id: str, query: str) -> None:
         print(f"[pinecone] Upsert failed: {e}")
 
 
-def search_user_queries(user_id: str, search_text: str, top_k: int = 10) -> List[Dict[str, Any]]:
+def search_user_queries(user_id: str, search_text: str, top_k: int = 5) -> List[Dict[str, Any]]:
     """
     Search for similar queries for a specific user.
     """

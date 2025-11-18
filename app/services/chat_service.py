@@ -23,7 +23,8 @@ async def chat(query: str, model_name: str = settings.first_model_name, user_id:
     logger.info(f"Query context from chat_service: {json.dumps(query_context, indent=2)}")
 
     # Get Local Context from redis
-    recent_context = get_last_n_messages(user_id, n=20)
+    recent_context = get_last_n_messages(user_id, n=10)
+    logger.info(f"Recent context from chat_service: {json.dumps(recent_context, indent=2)}")
 
     # Detect emotion
     # emotion = await detect_emotion(text)
