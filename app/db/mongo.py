@@ -1,9 +1,10 @@
 from motor.motor_asyncio import AsyncIOMotorClient
 from app.config import settings
 import logging
+from typing import Optional
 
 
-client: AsyncIOMotorClient = None
+client: Optional[AsyncIOMotorClient] = None
 db = None
 
 

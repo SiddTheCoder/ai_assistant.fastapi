@@ -3,9 +3,11 @@ import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import chat,tts,stt
+from app.routes import chat,tts,stt,crud
 from app.socket.socket_server import sio,connected_users,socket_app
 from app.socket.socket_utils import init_socket_utils
+from app.db.mongo import connect_to_mongo, close_mongo_connection
+from app.db.indexes import create_indexes
 
 # Configure logging
 logging.basicConfig(
@@ -19,9 +21,9 @@ async def lifespan(app: FastAPI):
     # ========== STARTUP ==========
     logging.info("🚀 Application starting up...")
     
-    # TODO: Connect to database
-    # await connect_to_mongo()
-    # logging.info("✅ Database connected")
+    await connect_to_mongo()
+    await create_indexes()
+    logging.info("✅ Database connected")
     
     logging.info("📡 WebSocket server available at /ws")
     init_socket_utils(sio, connected_users)
@@ -32,9 +34,9 @@ async def lifespan(app: FastAPI):
     # ========== SHUTDOWN ==========
     logging.info("👋 Application shutting down...")
     
-    #TODO : Close database connection
-    # await close_mongo_connection()
-    # logging.info("✅ Database disconnected")
+    await close_mongo_connection()
+    logging.info("✅ Database disconnected")
+
     # Cleanup resources
     from app.utils.async_utils import cleanup_executor
     cleanup_executor()
@@ -74,6 +76,7 @@ def health_check():
 app.include_router(chat.router)
 app.include_router(tts.router)
 app.include_router(stt.router)
+app.include_router(crud.router)
 
 
 # Mount WebSocket
