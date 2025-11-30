@@ -4,71 +4,54 @@ import logging
 from typing import Any
 from json_repair import repair_json
 from app.schemas.chat_schema import (
-    ActionDetails, 
-    ChatResponse, 
-    Confirmation, 
-    AnswerDetails
+    ActionDetails, ChatResponse, Confirmation, AnswerDetails
 )
 
 logger = logging.getLogger(__name__)
 
-
 def clean_ai_response(raw_data: str) -> ChatResponse:
-    """
-    Parse and validate AI response JSON with robust error handling.
-    Handles markdown wrappers, nested JSON, and malformed responses.
-    """
-
+    """Parse AI response with Hindi/English fields and robust error handling."""
+    
     try:
-        # Step 1: Remove markdown code blocks
+        # Strip markdown wrappers
         raw_data = raw_data.strip()
         if raw_data.startswith("```"):
-            raw_data = re.sub(r"^```[a-zA-Z]*\n?", "", raw_data)
-            raw_data = raw_data.rstrip("`").strip()
-
-        # Step 1.5: Repair malformed JSON
+            raw_data = re.sub(r"^```[a-zA-Z]*\n?", "", raw_data).rstrip("`").strip()
+        
+        # Repair malformed JSON
         try:
             raw_data = repair_json(raw_data)
         except Exception as e:
-            logger.warning(f"JSON repair failed, proceeding with original: {e}")
-
-        # Step 2: Parse JSON
+            logger.warning(f"JSON repair skipped: {e}")
+        
+        # Parse JSON
         data: Any = json.loads(raw_data)
-
-        # Step 3: Handle double-encoded JSON (string instead of dict)
+        
+        # Handle double-encoded JSON
         if isinstance(data, str):
-            logger.warning("Response is double-encoded string, parsing again...")
+            logger.warning("Double-encoded JSON detected, re-parsing...")
             data = json.loads(data)
-
-        # Step 4: Check for nested JSON in 'answer' field (common AI mistake)
+        
+        # Unwrap nested JSON in 'answer' field
         if "answer" in data and isinstance(data["answer"], str):
             try:
-                # Try to repair nested JSON before parsing
-                answer_str = data["answer"]
-                try:
-                    answer_str = repair_json(answer_str)
-                except Exception:
-                    pass
-                
-                potential_nested = json.loads(answer_str)
-                if isinstance(potential_nested, dict) and "actionDetails" in potential_nested:
-                    logger.warning("Unwrapping nested JSON from 'answer' field")
-                    data = potential_nested
-            except json.JSONDecodeError as je:
-                logger.warning(f"Nested JSON in 'answer' is malformed: {je}")
-                pass  # It's just a normal string answer
-            except TypeError:
+                nested = json.loads(repair_json(data["answer"]))
+                if isinstance(nested, dict) and "actionDetails" in nested:
+                    logger.warning("Unwrapping nested JSON from 'answer'")
+                    data = nested
+            except (json.JSONDecodeError, TypeError):
                 pass
-
-        # Step 5: Extract and validate fields
-        answer = data.get("answer", "").strip()
-        if "\\n" in answer:
-            answer = answer.replace("\\n", "\n")
-
+        
+        # Extract required fields
+        user_query = data.get("userQuery", "").strip()
+        answer = data.get("answer", "").strip().replace("\\n", "\n")
+        answer_english = data.get("answerEnglish", "").strip().replace("\\n", "\n")
+        action_msg = data.get("actionCompletedMessage", "").strip()
+        action_msg_en = data.get("actionCompletedMessageEnglish", "").strip()
         action = data.get("action", "").strip()
         emotion = data.get("emotion", "neutral").strip()
-
-        # Step 6: Parse answerDetails with defaults
+        
+        # Parse answerDetails
         answer_details_data = data.get("answerDetails", {})
         answer_details = AnswerDetails(
             content=answer_details_data.get("content", ""),
@@ -76,44 +59,40 @@ def clean_ai_response(raw_data: str) -> ChatResponse:
             references=answer_details_data.get("references", []),
             additional_info=answer_details_data.get("additional_info", {})
         )
-
-        # Step 7: Parse actionDetails with schema validation
+        
+        # Parse actionDetails
         action_details_data = data.get("actionDetails", {})
         action_details = _parse_action_details(action_details_data)
-
-        # Step 7.5: Add searchResults to actionDetails if available
-        if "searchResults" in action_details_data:
-            search_results = action_details_data.get("searchResults", [])
-            action_details.searchResults = search_results
-
-        # Step 8: Create validated response
+        
+        # Build validated response
         cleaned = ChatResponse(
+            userQuery=user_query,
             answer=answer,
+            answerEnglish=answer_english,
+            actionCompletedMessage=action_msg,
+            actionCompletedMessageEnglish=action_msg_en,
             action=action,
             emotion=emotion,
             answerDetails=answer_details,
             actionDetails=action_details
         )
-
-        logger.info(f"Successfully cleaned response: answer_length={len(answer)}, action={action}, emotion={emotion}")
-        return cleaned
-
-    except (json.JSONDecodeError, AttributeError, TypeError, KeyError) as e:
-        logger.error(f"Failed to parse AI response: {e}", exc_info=True)
-        logger.debug(f"Raw data causing error: {raw_data[:500]}...")
         
-        # Return fallback with raw data as answer
+        logger.info(f"Cleaned response: query={user_query[:30]}, action={action}, confirmed={action_details.confirmation.isConfirmed}")
+        return cleaned
+    
+    except (json.JSONDecodeError, AttributeError, TypeError, KeyError) as e:
+        logger.error(f"Parse failed: {e}", exc_info=True)
+        logger.debug(f"Raw data: {raw_data[:500]}...")
         return _create_fallback_response(raw_data)
 
-
 def _parse_action_details(data: dict) -> ActionDetails:
-    """Parse and validate actionDetails with nested confirmation."""
+    """Parse actionDetails with confirmation logic."""
     confirmation_data = data.get("confirmation", {})
     confirmation = Confirmation(
         isConfirmed=confirmation_data.get("isConfirmed", False),
         actionRegardingQuestion=confirmation_data.get("actionRegardingQuestion", "")
     )
-
+    
     return ActionDetails(
         type=data.get("type", ""),
         query=data.get("query", ""),
@@ -124,34 +103,27 @@ def _parse_action_details(data: dict) -> ActionDetails:
         app_name=data.get("app_name", ""),
         target=data.get("target", ""),
         location=data.get("location", ""),
-        confirmation=confirmation,
         searchResults=data.get("searchResults", []),
+        confirmation=confirmation,
         additional_info=data.get("additional_info", {})
     )
 
-
 def _create_fallback_response(raw_data: str) -> ChatResponse:
-    """Create safe fallback response when parsing fails."""
+    """Create safe fallback when parsing fails."""
     return ChatResponse(
-        answer=raw_data.strip() if raw_data else "Sorry, I couldn't process that response.",
+        userQuery="[Parse Error]",
+        answer=raw_data.strip()[:200] if raw_data else "Response processing failed.",
+        answerEnglish="Unable to process response.",
+        actionCompletedMessage="",
+        actionCompletedMessageEnglish="",
         action="",
         emotion="neutral",
         answerDetails=AnswerDetails(
-            content="",
-            sources=[],
-            references=[],
-            additional_info={}
+            content="", sources=[], references=[], additional_info={}
         ),
         actionDetails=ActionDetails(
-            type="",
-            query="",
-            title="",
-            artist="",
-            topic="",
-            platforms=[],
-            app_name="",
-            target="",
-            location="",
+            type="", query="", title="", artist="", topic="",
+            platforms=[], app_name="", target="", location="",
             searchResults=[],
             confirmation=Confirmation(isConfirmed=False, actionRegardingQuestion=""),
             additional_info={}

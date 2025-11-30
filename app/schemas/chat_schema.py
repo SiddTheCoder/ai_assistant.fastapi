@@ -30,7 +30,11 @@ class ChatRequest(BaseModel):
     text: str = Field(..., min_length=1, max_length=2000)
 
 class ChatResponse(BaseModel):
-    answer: str
+    userQuery: str  # Stores original user text
+    answer: str  # Hindi response
+    answerEnglish: str  # English version of answer
+    actionCompletedMessage: str  # Hindi action completion message
+    actionCompletedMessageEnglish: str  # English version
     action: str = ""
     emotion: str = "neutral"
     answerDetails: Optional[AnswerDetails] = None

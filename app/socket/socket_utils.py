@@ -3,8 +3,9 @@ WebSocket utility functions for easy event emission across the application.
 Import these functions anywhere you need to send real-time updates.
 """
 
-from typing import Any, Optional,Dict
+from typing import Any, Optional, Dict, Literal
 import logging
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -218,29 +219,36 @@ async def notify_all(message: str, notification_type: str = 'info') -> bool:
     })
 
 
-async def send_friend_request_notification(sender_id: str, receiver_id: str) -> bool:
-    """
-    Notify user of new friend request.
-    
-    Usage:
-        await send_friend_request_notification('user1', 'user2')
-    """
-    return await socket_emit('friend-request-received', {
-        'from': sender_id
-    }, user_id=receiver_id)
+# ==================== Sever Status Emitter FUNCTIONS ====================
+
+def get_user_by_sid(sid):
+    for user_id, saved_sid in _connected_users.items():
+        if saved_sid == sid:
+            return user_id
+    return None
+
+# [06:59 AM], November 24th 2025
+def formatted_timestamp():
+    now = datetime.now()
+    day = now.day
+
+    # Create ordinal suffix
+    if 11 <= day <= 13:
+        suffix = "th"
+    else:
+        suffix = {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
+
+    return now.strftime(f"[%I:%M %p], %B {day}{suffix} %Y")
 
 
-async def send_message_notification(sender_id: str, receiver_id: str, message_data: dict) -> bool:
-    """
-    Notify user of new message.
-    
-    Usage:
-        await send_message_notification('user1', 'user2', {
-            'content': 'Hello!',
-            'chatId': 'chat123'
-        })
-    """
-    return await socket_emit('new-message', {
-        'from': sender_id,
-        **message_data
-    }, user_id=receiver_id)
+async def emit_server_status(status: str, flag : str, sid: str) -> bool:
+    user_id = get_user_by_sid(sid)
+    return await socket_emit(
+        "server-status",
+        {
+            "flag" : "Success",
+            "status" : status,
+            "timestamp": formatted_timestamp()
+        },
+        user_id
+    )

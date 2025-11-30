@@ -13,7 +13,7 @@ from app.features.app_features.app_functions import open_notepad
 def open_app(details):
     """
     Opens apps or websites normally, or runs Chrome headless search using Selenium
-    if 'query' is provided.
+    if 'query' is provided
     """
     command = details.actionDetails.app_name.lower().strip()
     query = getattr(details.actionDetails, "query", "").strip()

@@ -3,8 +3,9 @@ import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import chat
-from app.socket.socket_server import socket_app
+from app.routes import chat,tts,stt
+from app.socket.socket_server import sio,connected_users,socket_app
+from app.socket.socket_utils import init_socket_utils
 
 # Configure logging
 logging.basicConfig(
@@ -23,6 +24,7 @@ async def lifespan(app: FastAPI):
     # logging.info("✅ Database connected")
     
     logging.info("📡 WebSocket server available at /ws")
+    init_socket_utils(sio, connected_users)
     logging.info("✅ Application startup complete")
     
     yield  # Application is running
@@ -33,7 +35,9 @@ async def lifespan(app: FastAPI):
     #TODO : Close database connection
     # await close_mongo_connection()
     # logging.info("✅ Database disconnected")
-    
+    # Cleanup resources
+    from app.utils.async_utils import cleanup_executor
+    cleanup_executor()
     logging.info("✅ Application shutdown complete")
 
 
@@ -68,6 +72,9 @@ def health_check():
 
 # Include routes
 app.include_router(chat.router)
+app.include_router(tts.router)
+app.include_router(stt.router)
+
 
 # Mount WebSocket
 app.mount("/socket.io", socket_app)

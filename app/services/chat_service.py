@@ -1,17 +1,20 @@
 from app.utils import openrouter_config, clean_ai_response
+import openai
 from app.config import settings
 # from app.services.detect_emotion import detect_emotion
 from app.services.actions.action_dispatcher import dispatch_action
-from app.libs.tts.speak import speak,speak_background
+from app.utils.async_utils import make_async
 from app.db.pinecone.config import (get_user_all_queries,search_user_queries)
 from app.cache.redis.config import get_last_n_messages,process_query_and_get_context
-from app.utils.build_prompt import format_context,build_prompt
+from app.utils.build_prompt import build_prompt
+from app.prompts import app_prompt_en,app_prompt_hi,app_prompt_ne
 import json
 import logging
 
 logger = logging.getLogger(__name__)
 
-async def chat(query: str, model_name: str = settings.first_model_name, user_id:str = "user_1"):
+@make_async
+def chat(query: str, model_name: str = settings.first_model_name, user_id:str = "user_1"):
     """
     Main chat handler with optimized prompt and error handling.
     """
@@ -31,7 +34,7 @@ async def chat(query: str, model_name: str = settings.first_model_name, user_id:
     emotion = "neutral"  
 
     # Build Prompt using context
-    prompt = build_prompt(emotion, query, recent_context, query_context)
+    prompt = app_prompt_en.build_prompt_en(emotion, query, recent_context, query_context)
     logger.info(f"Prompt from chat_service -------------------- \n: {prompt}")
 
     # Step 3: Call OpenRouter API
@@ -56,22 +59,30 @@ async def chat(query: str, model_name: str = settings.first_model_name, user_id:
     # Step 4: Clean and validate AI response
         cleaned_res = clean_ai_response.clean_ai_response(raw_response)
 
-    # Step 5: Decide and dispatch action if needed
-        if(cleaned_res):
-            final_data = decide_action(cleaned_res)
-            if(final_data): # type: ignore
-              logger.info(f"Final response from chat_service: {final_data}...")
-              return final_data
-            else:
-              logger.info(f"Final response from chat_service: {cleaned_res}...")
-              return cleaned_res
+    # Step 5: 
+        return cleaned_res
+
+    except openai.APIStatusError as e:
+        # Extract the actual error message from the API response
+        error_message = "Sorry, I'm having trouble reaching the AI server right now."
+        
+        try:
+            # Try to get the error message from the response body
+            if hasattr(e, 'response') and e.response is not None:
+                error_body = e.response.json()
+                if 'error' in error_body and 'message' in error_body['error']:
+                    error_message = error_body['error']['message']
+        except Exception:
+            # If parsing fails, use the string representation of the error
+            error_message = str(e)
+        
+        logger.error(f"OpenRouter API error: {error_message}", exc_info=True)
+        return _create_error_response(error_message, emotion)
 
     except Exception as e:
         logger.error(f"OpenRouter request failed: {e}", exc_info=True)
-        return _create_error_response(
-            "Sorry, I'm having trouble reaching the AI server right now.", 
-            emotion
-        )
+        error_message = str(e) if str(e) else "Sorry, I'm having trouble reaching the AI server right now."
+    return _create_error_response(error_message, emotion)
 
 """ """    
     
@@ -93,14 +104,18 @@ def decide_action(details):
         # speak_background(details.answer, speed=1)
         data = run_action_in_thread(details.actionDetails.type, details)
         return data
+    
 
-
-def _create_error_response(message: str, emotion: str):
-    """Helper to create fallback error responses."""
+def _create_error_response(message: str, emotion: str, query: str = ""):
+    """Helper to create fallback error responses with all required fields."""
     from app.schemas.chat_schema import ChatResponse, ActionDetails, Confirmation, AnswerDetails
     
     return ChatResponse(
+        userQuery=query,  # ✅ Added missing field
         answer=message,
+        answerEnglish=message,  # ✅ Added missing field (same as answer for errors)
+        actionCompletedMessage="",  # ✅ Added missing field (empty for errors)
+        actionCompletedMessageEnglish="",  # ✅ Added missing field (empty for errors)
         action="",
         emotion=emotion,
         answerDetails=AnswerDetails(
@@ -119,6 +134,7 @@ def _create_error_response(message: str, emotion: str):
             app_name="",
             target="",
             location="",
+            searchResults=[],  # Make sure this is also in your schema
             confirmation=Confirmation(isConfirmed=False, actionRegardingQuestion=""),
             additional_info={}
         )
