@@ -1,26 +1,40 @@
 from datetime import datetime, timedelta, timezone
 from jose import jwt
+import hashlib
 from passlib.context import CryptContext
 
 SECRET_KEY = "your-secret-key"
 ALGO = "HS256"
+ISSUER = "spark-api"
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def hash_password(password: str):
+    password = hashlib.sha256(password.encode()).hexdigest()
     return pwd_context.hash(password)
 
 def verify_password(plain, hashed):
+    plain = hashlib.sha256(plain.encode()).hexdigest()
     return pwd_context.verify(plain, hashed)
 
-def create_token(data: dict, expires_in: int):
-    to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + timedelta(minutes=expires_in)
-    to_encode["exp"] = expire
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGO)
+def create_token(user_id: str, token_type: str, expires_in: int):
+    now = datetime.now(timezone.utc)
+
+    payload = {
+        "sub": user_id,
+        "type": token_type,
+        "iat": int(now.timestamp()),
+        "exp": int((now + timedelta(minutes=expires_in)).timestamp()),
+        "iss": ISSUER,
+    }
+
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGO)
 
 def create_access_token(user_id: str):
-    return create_token({"sub": user_id, "type": "access"}, 30)
+    return create_token(user_id, "access", 30)
 
 def create_refresh_token(user_id: str):
-    return create_token({"sub": user_id, "type": "refresh"}, 60 * 24 * 7)
+    return create_token(user_id, "refresh", 60 * 24 * 7)
+
+def decode_token(token: str):
+    return jwt.decode(token, SECRET_KEY, algorithms=[ALGO], issuer=ISSUER)

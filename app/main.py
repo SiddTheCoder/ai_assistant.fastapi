@@ -3,7 +3,7 @@ import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import chat,tts,stt,crud,auth
+from app.routes import chat,tts,stt,auth
 from app.socket.socket_server import sio,connected_users,socket_app
 from app.socket.socket_utils import init_socket_utils
 from app.db.mongo import connect_to_mongo, close_mongo_connection
@@ -76,7 +76,6 @@ def health_check():
 app.include_router(chat.router)
 app.include_router(tts.router)
 app.include_router(stt.router)
-app.include_router(crud.router)
 app.include_router(auth.router)
 
 

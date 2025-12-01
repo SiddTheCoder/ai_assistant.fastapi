@@ -2,11 +2,9 @@ from app.utils import openrouter_config, clean_ai_response
 import openai
 from app.config import settings
 # from app.services.detect_emotion import detect_emotion
-from app.services.actions.action_dispatcher import dispatch_action
 from app.utils.async_utils import make_async
 from app.db.pinecone.config import (get_user_all_queries,search_user_queries)
 from app.cache.redis.config import get_last_n_messages,process_query_and_get_context
-from app.utils.build_prompt import build_prompt
 from app.prompts import app_prompt_en,app_prompt_hi,app_prompt_ne
 import json
 import logging
@@ -58,8 +56,6 @@ def chat(query: str, model_name: str = settings.first_model_name, user_id:str = 
         
     # Step 4: Clean and validate AI response
         cleaned_res = clean_ai_response.clean_ai_response(raw_response)
-
-    # Step 5: 
         return cleaned_res
 
     except openai.APIStatusError as e:
@@ -82,28 +78,7 @@ def chat(query: str, model_name: str = settings.first_model_name, user_id:str = 
     except Exception as e:
         logger.error(f"OpenRouter request failed: {e}", exc_info=True)
         error_message = str(e) if str(e) else "Sorry, I'm having trouble reaching the AI server right now."
-    return _create_error_response(error_message, emotion)
-
-""" """    
-    
-#TODO : Frontend will handle all the action dispatching and confirmation
-#TODO # later on this will only return the res and all action will be handled in the electron local devices
-# Function to decide and dispatch action in a separate thread
-def decide_action(details):
-    print("inside the decide_action function")
-    if(details.action == ""):
-        # speak_background(details.answer, speed=1)
-        # if(details.answerDetails.content != ""):
-        #     speak_background(details.answerDetails.content, speed=1)
-        return details
-    if(details.action != "" and details.actionDetails.confirmation.isConfirmed == False):
-        # speak_background(details.actionDetails.confirmation.actionRegardingQuestion, speed=1)
-        return details
-    if(details.action != "" and details.actionDetails.confirmation.isConfirmed == True):
-        from app.utils.run_action_in_thread import run_action_in_thread
-        # speak_background(details.answer, speed=1)
-        data = run_action_in_thread(details.actionDetails.type, details)
-        return data
+    return _create_error_response(error_message, emotion)    
     
 
 def _create_error_response(message: str, emotion: str, query: str = ""):
