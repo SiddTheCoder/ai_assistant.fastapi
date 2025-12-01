@@ -205,6 +205,71 @@ async def verify_otp_code(request: Request, data : auth_schema.VerifyTokenData):
         status_code=200
     )
 
+@router.post("/login", response_model = UserResponse)
+async def login(request: Request, user: UserModel):
+    if not user.email or not is_valid_email(user.email):
+        return send_error(
+            message="Email address is required or Invalid email address",
+            status_code=400
+        )
+
+    db = get_db()
+
+    # 1️⃣ Check if user already exists
+    existing_user = await db.users.find_one({"email": user.email})
+
+    if not existing_user:
+        return send_error(
+            message="User not found",
+            status_code=404
+        )
+    
+    # send verification email for login
+    try:
+        otp_code = generate_otp(6)
+
+        # Update user document for otp
+        user_doc = await db.users.find_one_and_update(
+            {"_id": existing_user["_id"]},
+            {"$set": 
+                {
+                "last_login": datetime.now(timezone.utc),
+                "verification_token": otp_code,
+                "verification_token_expires": datetime.now(timezone.utc) +      timedelta(minutes=10)
+                }
+            },
+            return_document=ReturnDocument.AFTER
+        )
+
+        # Serialize for JSON (ObjectId + datetime)
+        user_doc = serialize_doc(user_doc)
+
+        # Send verification email
+        verification_email.send(
+        to_email=existing_user["email"],
+        user_name=existing_user["username"],
+        otp_code=otp_code,
+        )
+
+        # Send response with tokens
+        return send_response(
+            request=request,
+            data={
+                "user": user_doc,
+                "emailStatus" : "Verification Token Sent"
+            },
+            message="User registered successfully",
+            status_code=201
+        )
+
+    except Exception as e:
+        return send_error(
+            message="Failed to register user",
+            status_code=500,
+            errors=str(e)
+        )
+
+
 @router.get("/me", response_model = UserResponse)
 def get_me(user = Depends(get_current_user)):
     return serialize_doc(user)

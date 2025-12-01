@@ -8,3 +8,6 @@ class Token(BaseModel):
 class VerifyTokenData(BaseModel):
   otp: str
   email: str  
+class LoginData(BaseModel):
+  otp: str
+  email: str  
