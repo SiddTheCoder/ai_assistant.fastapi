@@ -9,9 +9,19 @@ class UserModel(BaseModel):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     last_login: Optional[datetime] = None
     is_user_verified: bool = False
+    verification_token : Optional[str] = None
+    verification_token_expires: Optional[datetime] = None
     refresh_token: Optional[str] = None  # ⚠️ NEVER expose this
 
+    # --- UTM Parameters and advertiser tracking ---
+    advertiser_partner : Optional[str] = None
+    utm_source: Optional[str] = None
+    utm_medium: Optional[str] = None
+    utm_campaign: Optional[str] = None
+
+
     # --- Preferences & Interests ---
+    accepts_promotional_emails: bool = False
     language: str = "en"
     theme: str = "light"
     notifications_enabled: bool = True
@@ -50,6 +60,7 @@ class UserResponse(BaseModel):
     # ✅ NO refresh_token here
 
     # --- Preferences & Interests ---
+    accepts_promotional_emails: bool = False
     language: str = "en"
     theme: str = "light"
     notifications_enabled: bool = True
