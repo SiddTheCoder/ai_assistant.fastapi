@@ -106,7 +106,6 @@ def get_last_n_messages(user_id: str, n: int = 20) -> List[Dict[str, str]]:
     except Exception as e:
         safe_warn(f"Failed to get messages for user '{user_id}': {e}")
         return []
-        return []
 
 
 def clear_conversation_history(user_id: str) -> None:
@@ -197,7 +196,7 @@ def _simple_overlap_similarity(query: str, context: str) -> float:
     overlap = query_words.intersection(context_words)
     return len(overlap) / len(query_words)
 
-# ============ USAGE ============
+# ============ HYBRID USAGE ===============
 
 def process_query_and_get_context(user_id: str, current_query: str, 
                                       pinecone_search_func, 
@@ -241,3 +240,32 @@ def _append_message_to_local_and_cloud(user_id, current_query):
     add_message(user_id, "user", current_query)
     from app.db.pinecone.config import upsert_query
     upsert_query(user_id, current_query)
+
+
+# ============ USER DETAILS ==============
+def set_user_details(user_id: str, details: Dict[str, Any]) -> None:
+    try:
+        key = f"user_details:{user_id}"
+        redis_client.set(key, json.dumps(details))
+    except Exception as e:
+        safe_warn(f"Failed to set user details for user '{user_id}': {e}")
+
+
+def get_user_details(user_id: str) -> Optional[Dict[str, Any]]:
+    try:
+        key = f"user_details:{user_id}"
+        details = redis_client.get(key)
+        if details is not None:
+            return json.loads(cast(Union[str, bytes, bytearray], details))
+    except Exception as e:
+        safe_warn(f"Failed to get user details for user '{user_id}': {e}")
+    return None
+
+
+def clear_user_details(user_id: str) -> None:
+    try:
+        key = f"user_details:{user_id}"
+        redis_client.delete(key)
+    except Exception as e:
+        safe_warn(f"Failed to clear user details for user '{user_id}': {e}")
+ 

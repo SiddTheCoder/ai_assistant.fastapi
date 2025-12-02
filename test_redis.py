@@ -1,4 +1,4 @@
-from app.cache.redis.config import set_cache, get_cache, delete_cache, clear_cache, add_message, get_last_n_messages, clear_conversation_history,compute_similarity,process_query_and_get_context
+from app.cache.redis.config import set_cache, get_cache, delete_cache, clear_cache, add_message, get_last_n_messages, clear_conversation_history,compute_similarity,process_query_and_get_context,set_user_details,get_user_details,clear_user_details
 import json
 
 # from app.db.pinecone.config import (
@@ -17,7 +17,7 @@ import json
 # set_cache("test_key", cached_value, expire=60)
 
 
-clear_conversation_history("user_1")
+# clear_conversation_history("user_1")
 
 # add_message("user_1", "user", "Hey i loved one girl very much, Her name was ankita.")
 # add_message("user_1", "user", "I thought she would love me as i do . ")
@@ -30,8 +30,8 @@ clear_conversation_history("user_1")
 # for t in q:
 #   add_message("user_1", "user", t["query"])
 
-messages = get_last_n_messages("user_1")
-print("Last n Messages:", json.dumps(messages, indent=2))
+# messages = get_last_n_messages("user_1")
+# print("Last n Messages:", json.dumps(messages, indent=2))
 
 # mess  = "I loved her so much ankita"
 # res  = compute_similarity(mess, messages)
@@ -53,3 +53,11 @@ print("Last n Messages:", json.dumps(messages, indent=2))
 # print(f"\nContext: {json.dumps(context, indent=2)} found):")
 
 # print(f"\nState: {state} found):")
+
+# set_user_details("user_1", {"name": "John Doe", "age": 30})
+
+details = get_user_details("692e7408e468571218b2c47d")
+
+print(f"\nDetails: {json.dumps(details, indent=2)} found):")
+
+# clear_user_details("user_1")

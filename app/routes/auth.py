@@ -126,9 +126,10 @@ async def register_user(request: Request, user: UserModel):
             errors=str(e)
         )
 
+
+# This route is for verifying otp either verifying the user's email for the first time or login verification
 @router.post("/verify-otp")
 async def verify_otp_code(request: Request, data : auth_schema.VerifyTokenData):
-
     if not data.email or not is_valid_email(data.email):
         return send_error(
             message="Email address is required or Invalid email address",
@@ -195,18 +196,16 @@ async def verify_otp_code(request: Request, data : auth_schema.VerifyTokenData):
 
     return send_response(
         request=request,
-        data={
-            "user": user_doc,
-            "emailStatus" : "Verified"
-        },
+        data=user_doc,
         access_token=access_token,
         refresh_token=refresh_token,
         message="User verified successfully",
         status_code=200
     )
 
+
 @router.post("/login", response_model = UserResponse)
-async def login(request: Request, user: UserModel):
+async def login(request: Request, user: auth_schema.LoginData):
     if not user.email or not is_valid_email(user.email):
         return send_error(
             message="Email address is required or Invalid email address",
@@ -255,7 +254,7 @@ async def login(request: Request, user: UserModel):
         return send_response(
             request=request,
             data={
-                "user": user_doc,
+                "user": "Verification OTP Email Sent Successfully",
                 "emailStatus" : "Verification Token Sent"
             },
             message="User registered successfully",
@@ -269,6 +268,31 @@ async def login(request: Request, user: UserModel):
             errors=str(e)
         )
 
+# This route is for inserting api keys
+@router.post("/insert-api-keys")
+async def insert_keys(request:Request ,payload: auth_schema.APIKeys, user = Depends(get_current_user)):
+    from app.cache.redis.config import set_user_details
+    db= get_db()
+    print("user from middlware",user, "type of user",type(user))
+    updated_user = await db.users.find_one_and_update(
+        {"_id": ObjectId(user["_id"])},
+        {"$set": {
+            "openrouter_api_key": payload.openrouter_api_key,
+            "gemini_api_key": payload.gemini_api_key
+        }},
+        return_document=ReturnDocument.AFTER
+    )
+
+    updated_user = serialize_doc(updated_user)
+    print("updated_user",updated_user)
+    set_user_details(updated_user["_id"],updated_user)
+    return send_response(
+        request=request,
+        data=updated_user,
+        message="API keys updated successfully",
+        status_code=200
+    )
+
 
 @router.get("/me", response_model = UserResponse)
 def get_me(user = Depends(get_current_user)):
@@ -279,3 +303,8 @@ async def get_users():
     db = get_db()
     res = db.users.find({})
     return serialize_doc(res)
+
+@router.get("/load_user")
+async def test_load_user_from_redis(user_id: str):
+    from app.utils.load_user_from_redis import load_user
+    return await load_user(user_id)

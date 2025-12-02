@@ -9,5 +9,8 @@ class VerifyTokenData(BaseModel):
   otp: str
   email: str  
 class LoginData(BaseModel):
-  otp: str
   email: str  
+
+class APIKeys(BaseModel):
+  openrouter_api_key: str
+  gemini_api_key: str  

@@ -13,6 +13,12 @@ class UserModel(BaseModel):
     verification_token_expires: Optional[datetime] = None
     refresh_token: Optional[str] = None  # ⚠️ NEVER expose this
 
+    # API KEYS MANAGEMENT
+    gemini_api_key: Optional[str] = None
+    openrouter_api_key: Optional[str] = None
+    is_gemini_api_quota_reached: bool = False
+    is_openrouter_api_quota_reached: bool = False
+
     # --- UTM Parameters and advertiser tracking ---
     advertiser_partner : Optional[str] = None
     utm_source: Optional[str] = None

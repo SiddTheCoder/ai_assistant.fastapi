@@ -1,12 +1,13 @@
 from fastapi import Request, HTTPException, status, Depends
 from jose import JWTError
 from bson import ObjectId
+from app.utils.serialize_mongo_doc import serialize_doc
 
 from app.jwt.config import decode_token
 from app.db.mongo import get_db
 
 async def get_current_user(request: Request, db=Depends(get_db)):
-    token = request.cookies.get("token") or request.headers.get("Authorization") or request.query_params.get("token")
+    token = request.cookies.get("access_token") or request.headers.get("Authorization") or request.query_params.get("access_token")
 
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
@@ -33,7 +34,7 @@ async def get_current_user(request: Request, db=Depends(get_db)):
 
     if not user:
         raise HTTPException(status_code=401, detail="User no longer exists")
-
+    
     # ✅ attach full user to request
     request.state.user = user
 

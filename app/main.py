@@ -78,6 +78,5 @@ app.include_router(tts.router)
 app.include_router(stt.router)
 app.include_router(auth.router)
 
-
 # Mount WebSocket
 app.mount("/socket.io", socket_app)

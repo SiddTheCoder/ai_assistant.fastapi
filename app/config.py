@@ -2,8 +2,10 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     openrouter_api_key: str
-    first_model_name: str 
-    second_model_name: str 
+    gemini_api_key: str
+    gemini_model_name: str
+    openrouter_light_model_name: str 
+    openrouter_reasoning_model_name: str 
     port : int
     default_lang: str = "en"
     pinecone_api_key: str
