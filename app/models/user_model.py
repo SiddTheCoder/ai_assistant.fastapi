@@ -29,6 +29,7 @@ class UserModel(BaseModel):
     # --- Preferences & Interests ---
     accepts_promotional_emails: bool = False
     language: str = "en"
+    ai_gender: str = "male"
     theme: str = "light"
     notifications_enabled: bool = True
     categories_of_interest: List[str] = []
@@ -58,12 +59,10 @@ class UserModel(BaseModel):
 
 # Response model for API endpoints (excludes sensitive data)
 class UserResponse(BaseModel):
-    id: str = Field(..., alias="_id")
     username: Optional[str] = None
     email: Optional[EmailStr] = None
-    created_at: datetime
+    created_at: datetime = Field(default_factory=datetime.utcnow)
     last_login: Optional[datetime] = None
-    # ✅ NO refresh_token here
 
     # --- Preferences & Interests ---
     accepts_promotional_emails: bool = False
@@ -86,6 +85,7 @@ class UserResponse(BaseModel):
     # --- System / Usage Metrics ---
     last_active_at: Optional[datetime] = None
     session_count: int = 0
+    preferences_history: List[Dict[str, Any]] = []
 
     # --- Miscellaneous ---
     custom_attributes: Dict[str, Any] = {}

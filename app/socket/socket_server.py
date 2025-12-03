@@ -3,9 +3,13 @@ import logging
 from typing import Dict
 import edge_tts
 import asyncio
+from app.config import settings
 from app.services.stt_service import transcribe_audio
-from app.socket.socket_utils import socket_emit,emit_server_status
+from app.socket.socket_utils import emit_server_status
+from app.utils import load_user_from_redis
 from app.services.chat_service import chat
+from app.schemas.schemae import RequestTTS
+from app.helper import model_parser
 logger = logging.getLogger(__name__)
 
 # Create Socket.IO server with increased timeouts
@@ -89,21 +93,45 @@ async def serialize_response(chatRes) -> dict:
 # ==================== MESSAGING EVENTS ====================
 
 @sio.on("request-tts") #type: ignore
-async def request_tts(sid, data):
+async def request_tts(sid, data: RequestTTS):
     logger.info(f"⚡ request-tts from {sid}")
+    # convert to RequestTTS Pydantic model type 
+    data = model_parser.parse(RequestTTS, data)
 
     try:
         # Validate payload
-        if not data or "text" not in data:
+        if not data.text:
             await sio.emit(
                 "response-tts",
                 {"success": False, "error": "Missing text"},
                 to=sid
             )
             return
+        
+        if not data.user_id:
+            await sio.emit(
+                "response-tts",
+                {"success": False, "error": "Missing user_id"},
+                to=sid
+            )
+            return
+        
+        text = data.text
+        voice = settings.eng_voice_male
 
-        text = data.get("text")
-        voice = data.get("voice", "hi-IN-MadhurNeural")
+        # load user and user voice preferneces
+        user = await load_user_from_redis.load_user(data.user_id)
+        
+        gender = user.get("ai_gender", "").strip().lower()
+        lang = user.get("language", "").strip().lower()
+
+        if lang == "ne":
+            voice = settings.nep_voice_male if gender == "male" else settings.nep_voice_female
+        elif lang == "hi":
+            voice = settings.hindi_voice_male if gender == "male" else settings.hindi_voice_female
+        else:
+            voice = settings.eng_voice_male if gender == "male" else settings.eng_voice_female
+
 
         # Notify frontend: starting
         await sio.emit("tts-start", {"text": text, "voice": voice}, to=sid)
@@ -111,7 +139,7 @@ async def request_tts(sid, data):
         communicator = edge_tts.Communicate(
             text,
             voice,
-            rate="+20%",
+            rate="+15%",
             pitch="-5Hz"
         )
 
@@ -133,7 +161,7 @@ async def request_tts(sid, data):
                 audio_bytes,   # <-- NO binary=True needed
                 to=sid
             )
-            # await asyncio.sleep(0.01)  # Small delay to prevent flooding
+            await asyncio.sleep(0.01)  # Small delay to prevent flooding
 
         # End event
         await sio.emit("tts-end", {"success": True}, to=sid)
@@ -155,7 +183,8 @@ async def send_user_text_query(sid, query):
     try:
         from app.services.chat_service import chat
         
-        chatRes = await chat(query)
+        # If chat is synchronous, run it in a thread so it can be awaited safely
+        chatRes = await asyncio.to_thread(chat, query)
         dict_data = await serialize_response(chatRes)
         
         await sio.emit(
@@ -209,6 +238,12 @@ async def send_user_voice_query(sid, data):
             await sio.emit("query-result", {"error": "Invalid audio format", "success": False}, to=sid)
             return
         
+        user_id = data.get("user_id")
+        if user_id is None:
+            logger.error(f"❌ User ID not found in payload for sid: {sid}")
+            await sio.emit("query-error", {"error": "User ID not found", "success": False}, to=sid)
+            user_id = "guest"
+        
         # ✅ Send immediate acknowledgment to keep connection alive
         await sio.emit("processing", {"status": "Transcribing audio..."}, to=sid)
         
@@ -221,9 +256,8 @@ async def send_user_voice_query(sid, data):
         if text and text not in ["", "[No speech detected]", "[Transcription failed], [Empty audio file]"]:
             # Send status update
             await sio.emit("processing", {"status": "Getting response..."}, to=sid)
-            
-            # Get chat response
-            chatRes = await chat(text)
+            # Get chat response (run in thread if chat is synchronous)
+            chatRes = await chat(text, user_id)
             dict_data = await serialize_response(chatRes)
             
             # Send final result
@@ -236,6 +270,7 @@ async def send_user_voice_query(sid, data):
                 },
                 to=sid
             )
+            logger.info(f"✅ Sent complete query-result to {sid}")
             logger.info(f"✅ Sent complete query-result to {sid}")
         else:
             # No valid speech detected

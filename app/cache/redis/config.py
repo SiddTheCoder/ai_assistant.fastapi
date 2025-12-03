@@ -269,3 +269,20 @@ def clear_user_details(user_id: str) -> None:
     except Exception as e:
         safe_warn(f"Failed to clear user details for user '{user_id}': {e}")
  
+def override_user_details(user_id: str, details: Dict[str, Any]) -> None:
+    try:
+        set_user_details(user_id, details)
+    except Exception as e:
+        safe_warn(f"Failed to override user details for user '{user_id}': {e}") 
+
+def update_user_details(user_id: str, details: Dict[str, Any]) -> None:
+    try:
+        key = f"user_details:{user_id}"
+        existing_details = get_user_details(user_id)
+        if existing_details is None:
+            set_user_details(user_id, details)  
+        else:
+            existing_details.update(details)
+            set_user_details(user_id, existing_details)
+    except Exception as e:
+        safe_warn(f"Failed to update user details for user '{user_id}': {e}")      

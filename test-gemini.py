@@ -1,9 +1,11 @@
 from openai import OpenAI
+from app.config import settings
 
 client = OpenAI(
-    api_key="AIzaSyDf4WUMRpf9J_2oGc-i681pDMdj4z3Ahoo",
+    api_key=settings.gemini_api_key,
     base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
 )
+
 
 response = client.chat.completions.create(
     model="gemini-2.0-flash",

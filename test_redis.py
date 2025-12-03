@@ -1,6 +1,6 @@
-from app.cache.redis.config import set_cache, get_cache, delete_cache, clear_cache, add_message, get_last_n_messages, clear_conversation_history,compute_similarity,process_query_and_get_context,set_user_details,get_user_details,clear_user_details
+from app.cache.redis.config import set_cache, get_cache, delete_cache, clear_cache, add_message, get_last_n_messages, clear_conversation_history,compute_similarity,process_query_and_get_context,set_user_details,get_user_details,clear_user_details,update_user_details
 import json
-
+import asyncio
 # from app.db.pinecone.config import (
 #     get_user_all_queries,
 #     search_user_queries
@@ -55,9 +55,19 @@ import json
 # print(f"\nState: {state} found):")
 
 # set_user_details("user_1", {"name": "John Doe", "age": 30})
+# from app.utils.load_user_from_redis import load_user
 
-details = get_user_details("692e7408e468571218b2c47d")
+# async def hey():
+#   data = await load_user("692fdcf972c87e5123256ec0")
+#   # print("dtaa", data)
+#   set_user_details("guest", data)
+
+# asyncio.run(hey())
+update_user_details("guest", {"ai_gender": "male", "language": "hi"})
+details = get_user_details("guest")
+# # if details:
+# #   set_user_details("guest", details)
 
 print(f"\nDetails: {json.dumps(details, indent=2)} found):")
 
-# clear_user_details("user_1")
+# clear_user_details("692fdcf972c87e5123256ec0")

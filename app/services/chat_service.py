@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 async def chat(
     query: str,
-    user_id: str = "user_1",
+    user_id: str = "guest",
     model_name: Optional[str] = None
 ):
     """
@@ -63,8 +63,15 @@ async def chat(
         emotion = "neutral"
             
         # --- Step 4: Build Prompt ---
-        prompt = app_prompt_hi.build_prompt_hi(emotion, query, recent_context, query_context)
-        logger.info(f"📝 Prompt built: {prompt[:200]}...")
+        if user_details["language"] == "ne":
+            prompt = app_prompt_ne.build_prompt_ne(emotion, query, recent_context, query_context)
+            logger.info(f"📝 Prompt built: {prompt[:200]}...")    
+        elif user_details["language"] == "hi":
+            prompt = app_prompt_hi.build_prompt_hi(emotion, query, recent_context, query_context)
+            logger.info(f"📝 Prompt built: {prompt[:200]}...")
+        else:
+            prompt = app_prompt_en.build_prompt_en(emotion, query, recent_context, query_context)
+            logger.info(f"📝 Prompt built: {prompt[:200]}...")
 
         # --- Step 5: Call AI with Smart Fallback ---
         provider_manager = ProviderManager(user_details)

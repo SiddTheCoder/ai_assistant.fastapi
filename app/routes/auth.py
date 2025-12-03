@@ -293,7 +293,6 @@ async def insert_keys(request:Request ,payload: auth_schema.APIKeys, user = Depe
         status_code=200
     )
 
-
 @router.get("/me", response_model = UserResponse)
 def get_me(user = Depends(get_current_user)):
     return serialize_doc(user)

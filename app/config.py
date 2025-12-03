@@ -16,6 +16,12 @@ class Settings(BaseSettings):
     ai_name: str = "SPARK"
     mongo_uri : str 
     db_name : str = "spark"
+    nep_voice_male : str = "ne-NP-SagarNeural"
+    nep_voice_female : str = "ne-NP-HemkalaNeural"
+    hindi_voice_male : str = "hi-IN-MadhurNeural"
+    hindi_voice_female : str = "hi-IN-SwaraNeural"
+    eng_voice_male : str = "en-US-BrianNeural"
+    eng_voice_female : str = "en-US-JennyNeural"
 
     class Config:
         env_file = ".env"
