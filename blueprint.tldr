@@ -36,9 +36,9 @@
 		{
 			"id": "pointer:pointer",
 			"typeName": "pointer",
-			"x": -3018.0943445929224,
-			"y": -5443.418115267121,
-			"lastActivityTimestamp": 1762699636072,
+			"x": -7002.949864680963,
+			"y": -2595.9493585239215,
+			"lastActivityTimestamp": 1765205213003,
 			"meta": {}
 		},
 		{
@@ -53,7 +53,7 @@
 			"props": {
 				"color": "orange",
 				"size": "xl",
-				"w": 949.3619384765625,
+				"w": 4743.329366391819,
 				"font": "draw",
 				"textAlign": "start",
 				"autoSize": true,
@@ -63,6 +63,9 @@
 					"content": [
 						{
 							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
 							"content": [
 								{
 									"type": "text",
@@ -72,6 +75,9 @@
 						},
 						{
 							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
 							"content": [
 								{
 									"type": "text",
@@ -81,6 +87,9 @@
 						},
 						{
 							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
 							"content": [
 								{
 									"type": "text",
@@ -90,6 +99,9 @@
 						},
 						{
 							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
 							"content": [
 								{
 									"type": "text",
@@ -99,6 +111,9 @@
 						},
 						{
 							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
 							"content": [
 								{
 									"type": "text",
@@ -108,6 +123,9 @@
 						},
 						{
 							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
 							"content": [
 								{
 									"type": "text",
@@ -117,6 +135,9 @@
 						},
 						{
 							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
 							"content": [
 								{
 									"type": "text",
@@ -126,6 +147,9 @@
 						},
 						{
 							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
 							"content": [
 								{
 									"type": "text",
@@ -135,6 +159,9 @@
 						},
 						{
 							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
 							"content": [
 								{
 									"type": "text",
@@ -144,6 +171,9 @@
 						},
 						{
 							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
 							"content": [
 								{
 									"type": "text",
@@ -153,6 +183,9 @@
 						},
 						{
 							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
 							"content": [
 								{
 									"type": "text",
@@ -162,6 +195,9 @@
 						},
 						{
 							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
 							"content": [
 								{
 									"type": "text",
@@ -171,6 +207,9 @@
 						},
 						{
 							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
 							"content": [
 								{
 									"type": "text",
@@ -180,6 +219,9 @@
 						},
 						{
 							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
 							"content": [
 								{
 									"type": "text",
@@ -189,6 +231,9 @@
 						},
 						{
 							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
 							"content": [
 								{
 									"type": "text",
@@ -198,6 +243,9 @@
 						},
 						{
 							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
 							"content": [
 								{
 									"type": "text",
@@ -207,6 +255,9 @@
 						},
 						{
 							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
 							"content": [
 								{
 									"type": "text",
@@ -216,6 +267,9 @@
 						},
 						{
 							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
 							"content": [
 								{
 									"type": "text",
@@ -225,6 +279,9 @@
 						},
 						{
 							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
 							"content": [
 								{
 									"type": "text",
@@ -234,6 +291,9 @@
 						},
 						{
 							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
 							"content": [
 								{
 									"type": "text",
@@ -243,6 +303,9 @@
 						},
 						{
 							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
 							"content": [
 								{
 									"type": "text",
@@ -252,6 +315,9 @@
 						},
 						{
 							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
 							"content": [
 								{
 									"type": "text",
@@ -261,6 +327,9 @@
 						},
 						{
 							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
 							"content": [
 								{
 									"type": "text",
@@ -270,6 +339,9 @@
 						},
 						{
 							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
 							"content": [
 								{
 									"type": "text",
@@ -279,15 +351,21 @@
 						},
 						{
 							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
 							"content": [
 								{
 									"type": "text",
-									"text": "⠀⠀⠀⠀⠀⠀⢸⣿⠛⢿⣷⣤⣿⣿⣦⣄⣀⣀⣀⣀⣀⣀⣀⣤⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⣦⡀⠀⢹⡄⠀⠀⠀⠀\r"
+									"text": "⠀⠀⠀⠀⠀⠀⢸⣿⠛⢿⣷⣤⣿⣿⣦⣄⣀⣀⣀⣀⣀⣀⣀⣤⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⣦⡀⠀⢹⡄⠀⠀⠀⠀ "
 								}
 							]
 						},
 						{
 							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
 							"content": [
 								{
 									"type": "text",
@@ -297,6 +375,9 @@
 						},
 						{
 							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
 							"content": [
 								{
 									"type": "text",
@@ -306,6 +387,9 @@
 						},
 						{
 							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
 							"content": [
 								{
 									"type": "text",
@@ -315,6 +399,9 @@
 						},
 						{
 							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
 							"content": [
 								{
 									"type": "text",
@@ -324,6 +411,9 @@
 						},
 						{
 							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
 							"content": [
 								{
 									"type": "text",
@@ -333,6 +423,9 @@
 						},
 						{
 							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
 							"content": [
 								{
 									"type": "text",
@@ -342,6 +435,9 @@
 						},
 						{
 							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
 							"content": [
 								{
 									"type": "text",
@@ -351,6 +447,9 @@
 						},
 						{
 							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
 							"content": [
 								{
 									"type": "text",
@@ -360,6 +459,9 @@
 						},
 						{
 							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
 							"content": [
 								{
 									"type": "text",
@@ -369,6 +471,9 @@
 						},
 						{
 							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
 							"content": [
 								{
 									"type": "text",
@@ -378,6 +483,9 @@
 						},
 						{
 							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
 							"content": [
 								{
 									"type": "text",
@@ -387,6 +495,9 @@
 						},
 						{
 							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
 							"content": [
 								{
 									"type": "text",
@@ -396,6 +507,9 @@
 						},
 						{
 							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
 							"content": [
 								{
 									"type": "text",
@@ -411,9 +525,9 @@
 			"typeName": "shape"
 		},
 		{
-			"x": 12694.916854358547,
-			"y": 9526.751245149933,
-			"z": 0.05,
+			"x": 8459.235871477827,
+			"y": 4334.676396243712,
+			"z": 0.2450068301454994,
 			"meta": {},
 			"id": "camera:page:page",
 			"typeName": "camera"
@@ -791,12 +905,12 @@
 			"typeName": "shape"
 		},
 		{
-			"editingShapeId": null,
+			"editingShapeId": "shape:_6gBjFElKSp5eauxbRCbK",
 			"croppingShapeId": null,
 			"selectedShapeIds": [
-				"shape:EbA6pOewy8zQwKZMZIxVO"
+				"shape:_6gBjFElKSp5eauxbRCbK"
 			],
-			"hoveredShapeId": "shape:EbA6pOewy8zQwKZMZIxVO",
+			"hoveredShapeId": "shape:_6gBjFElKSp5eauxbRCbK",
 			"erasingShapeIds": [],
 			"hintingShapeIds": [],
 			"focusedGroupId": null,
@@ -822,11 +936,7 @@
 		{
 			"followingUserId": null,
 			"opacityForNextShape": 1,
-			"stylesForNextShape": {
-				"tldraw:size": "xl",
-				"tldraw:color": "orange",
-				"tldraw:geo": "rectangle"
-			},
+			"stylesForNextShape": {},
 			"brush": null,
 			"scribbles": [],
 			"cursor": {
@@ -840,8 +950,8 @@
 			"screenBounds": {
 				"x": 0,
 				"y": 0,
-				"w": 1080.833251953125,
-				"h": 618.3333129882812
+				"w": 1188,
+				"h": 724
 			},
 			"insets": [
 				false,
@@ -856,7 +966,7 @@
 			"isChatting": false,
 			"highlightedUserIds": [],
 			"isFocused": true,
-			"devicePixelRatio": 1.2000000476837158,
+			"devicePixelRatio": 1.25,
 			"isCoarsePointer": false,
 			"isHoveringCanvas": true,
 			"openMenus": [],

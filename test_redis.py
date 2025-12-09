@@ -63,7 +63,7 @@ import asyncio
 #   set_user_details("guest", data)
 
 # asyncio.run(hey())
-update_user_details("guest", {"ai_gender": "male", "language": "hi"})
+update_user_details("guest", {"ai_gender": "female", "language": "hi"})
 details = get_user_details("guest")
 # # if details:
 # #   set_user_details("guest", details)

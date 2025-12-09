@@ -5,7 +5,7 @@ from app.config import settings
 # from app.services.detect_emotion import detect_emotion
 from app.db.pinecone.config import (get_user_all_queries,search_user_queries)
 from app.cache.redis.config import get_last_n_messages,process_query_and_get_context
-from app.prompts import app_prompt_en,app_prompt_hi,app_prompt_ne
+from app.prompts import app_prompt
 import json
 import logging
 
@@ -64,13 +64,13 @@ async def chat(
             
         # --- Step 4: Build Prompt ---
         if user_details["language"] == "ne":
-            prompt = app_prompt_ne.build_prompt_ne(emotion, query, recent_context, query_context)
+            prompt = app_prompt.build_prompt_ne(emotion, query, recent_context, query_context)
             logger.info(f"📝 Prompt built: {prompt[:200]}...")    
         elif user_details["language"] == "hi":
-            prompt = app_prompt_hi.build_prompt_hi(emotion, query, recent_context, query_context)
+            prompt = app_prompt.build_prompt_hi(emotion, query, recent_context, query_context)
             logger.info(f"📝 Prompt built: {prompt[:200]}...")
         else:
-            prompt = app_prompt_en.build_prompt_en(emotion, query, recent_context, query_context)
+            prompt = app_prompt.build_prompt_en(emotion, query, recent_context, query_context)
             logger.info(f"📝 Prompt built: {prompt[:200]}...")
 
         # --- Step 5: Call AI with Smart Fallback ---

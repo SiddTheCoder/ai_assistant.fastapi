@@ -18,7 +18,7 @@ class OpenRouterClient:
     - User-specific API keys (from user profile)
     """
     
-    DEFAULT_MODEL = "google/gemini-2.0-flash-thinking-exp:free"  # Or your preferred model
+    DEFAULT_MODEL = settings.openrouter_reasoning_model_name 
     BASE_URL = "https://openrouter.ai/api/v1"
     
     def __init__(self, api_key: Optional[str] = None, quota_reached: bool = False):
