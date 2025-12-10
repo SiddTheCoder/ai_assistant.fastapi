@@ -242,6 +242,19 @@ def formatted_timestamp():
 
 
 async def emit_server_status(status: str, flag : str, sid: str) -> bool:
+    """
+    Emit a server status message to a specific user identified by session ID (sid).
+
+    as ws.emit("server-status")
+
+    Args:
+        status (str): The status message to send.
+        flag (str): A flag indicating the type or severity of the status.
+        sid (str): The session ID of the user to whom the status should be sent.
+    
+    Returns:
+        bool: True if the event was emitted successfully, False otherwise.
+    """
     user_id = get_user_by_sid(sid)
     return await socket_emit(
         "server-status",

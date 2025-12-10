@@ -1,7 +1,7 @@
 import socketio
 import logging
 from typing import Dict
-import edge_tts
+from app.services.tts_service import tts_service
 import asyncio
 from app.config import settings
 from app.services.stt_service import transcribe_audio
@@ -95,36 +95,27 @@ async def serialize_response(chatRes) -> dict:
 @sio.on("request-tts") #type: ignore
 async def request_tts(sid, data: RequestTTS):
     logger.info(f"⚡ request-tts from {sid}")
-    # convert to RequestTTS Pydantic model type 
     data = model_parser.parse(RequestTTS, data)
-
+    await emit_server_status("TTS Request Received","Success", sid)
     try:
         # Validate payload
         if not data.text:
-            await sio.emit(
-                "response-tts",
-                {"success": False, "error": "Missing text"},
-                to=sid
-            )
+            await sio.emit("response-tts", {"success": False, "error": "Missing text"}, to=sid)
+            await emit_server_status("Error: Missing text","Error", sid)
             return
         
         if not data.user_id:
-            await sio.emit(
-                "response-tts",
-                {"success": False, "error": "Missing user_id"},
-                to=sid
-            )
+            await sio.emit("response-tts", {"success": False, "error": "Missing user_id"}, to=sid)
+            await emit_server_status("Error: Missing user_id","Error", sid)
             return
-        
-        text = data.text
-        voice = settings.eng_voice_male
 
-        # load user and user voice preferneces
+        # Load user preferences
         user = await load_user_from_redis.load_user(data.user_id)
-        
         gender = user.get("ai_gender", "").strip().lower()
         lang = user.get("language", "").strip().lower()
+        await emit_server_status(f"Loaded user preferences as gender={gender}, language={lang}","Success", sid)
 
+        # Select voice
         if lang == "ne":
             voice = settings.nep_voice_male if gender == "male" else settings.nep_voice_female
         elif lang == "hi":
@@ -132,48 +123,25 @@ async def request_tts(sid, data: RequestTTS):
         else:
             voice = settings.eng_voice_male if gender == "male" else settings.eng_voice_female
 
+        logger.info(f"Using voice: {voice} for user: {data.user_id}")
 
-        # Notify frontend: starting
-        await sio.emit("tts-start", {"text": text, "voice": voice}, to=sid)
-
-        communicator = edge_tts.Communicate(
-            text,
-            voice,
-            rate="+15%",
-            pitch="-5Hz"
+        # Stream via service
+        success = await tts_service.stream_to_socket(
+            sio=sio,
+            sid=sid,
+            text=data.text,
+            voice=voice
         )
 
-        async for chunk in communicator.stream():
+        if not success:
+            await sio.emit("response-tts", {"success": False, "error": "TTS generation failed"}, to=sid)
+            await emit_server_status("Error: TTS generation failed","Error", sid)
+            return
 
-            # SAFEST POSSIBLE FILTER:
-            if chunk.get("type") != "audio":
-                continue
-
-            audio_bytes = chunk.get("data")
-
-            # Additional safety: skip empty chunks
-            if not audio_bytes:
-                continue
-
-            # python-socketio auto-handles binary if bytes
-            await sio.emit(
-                "tts-chunk",
-                audio_bytes,   # <-- NO binary=True needed
-                to=sid
-            )
-            await asyncio.sleep(0.01)  # Small delay to prevent flooding
-
-        # End event
-        await sio.emit("tts-end", {"success": True}, to=sid)
-
+        await emit_server_status("TTS generation completed successfully","Success", sid)
     except Exception as e:
         logger.exception("TTS ERROR:")
-        await sio.emit(
-            "response-tts",
-            {"success": False, "error": str(e)},
-            to=sid
-        )
-
+        await sio.emit("response-tts", {"success": False, "error": str(e)}, to=sid)
 
 @sio.on("send-user-text-query") #type: ignore
 async def send_user_text_query(sid, query):
