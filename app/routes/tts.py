@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
-from app.services.tts_service import tts_service
+from app.services.tts_services import tts_service
 from pydantic import BaseModel
 
 router = APIRouter()

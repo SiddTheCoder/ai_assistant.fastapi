@@ -1,12 +1,12 @@
 import socketio
 import logging
 from typing import Dict
-from app.services.tts_service import tts_service
+from app.services.tts_services import tts_service
 import asyncio
 from app.config import settings
-from app.services.stt_service import transcribe_audio
+from app.services import transcribe_audio
 from app.socket.socket_utils import emit_server_status
-from app.utils import load_user_from_redis
+from app.cache.load_user import load_user 
 from app.services.chat_service import chat
 from app.schemas.schemae import RequestTTS
 from app.helper import model_parser
@@ -110,7 +110,7 @@ async def request_tts(sid, data: RequestTTS):
             return
 
         # Load user preferences
-        user = await load_user_from_redis.load_user(data.user_id)
+        user = await load_user(data.user_id)
         gender = user.get("ai_gender", "").strip().lower()
         lang = user.get("language", "").strip().lower()
         await emit_server_status(f"Loaded user preferences as gender={gender}, language={lang}","Success", sid)
@@ -170,93 +170,75 @@ async def send_user_text_query(sid, query):
             to=sid
         )
 
-
-@sio.on("send-user-voice-query") #type: ignore
-async def send_user_voice_query(sid, data): 
-    """Handle voice query from client - now fully async and non-blocking"""
-    logger.info(f"🔥 send_user_voice_query triggered for sid: {sid}")
-    # Emit server status
-    await emit_server_status("Backend Fired Up","Success", sid)
-    await emit_server_status("Analyzing your data","Success", sid)
+@sio.on("send-user-voice-query")  # type: ignore
+async def send_user_voice_query(sid, data):
+    """
+    Simplified version - minimal changes from your original
+    Just uses the service layer
+    """
+    logger.info(f"🔥 Voice query (simple) triggered for sid: {sid}")
+    
+    await emit_server_status("Backend Fired Up", "Success", sid)
+    await emit_server_status("Analyzing your data", "Success", sid)
     
     if not data:
         logger.error(f"❌ No data received for sid: {sid}")
         await sio.emit("query-error", {"error": "No data received", "success": False}, to=sid)
-        await emit_server_status("Error: No data received","Error", sid)
+        await emit_server_status("Error: No data received", "Error", sid)
         return
     
     try:
-        # Extract audio data
         audio_data = data.get("audio")
         mime_type = data.get("mimeType", "audio/webm")
         
         if not audio_data:
             logger.error(f"❌ No audio data in payload for sid: {sid}")
             await sio.emit("query-error", {"error": "No audio data", "success": False}, to=sid)
-            await emit_server_status("Audio Data not revcieved","Errpr", sid)
+            await emit_server_status("Audio data not received", "Error", sid)
             return
         
-        # Log data info
         if isinstance(audio_data, str):
             logger.info(f"📊 Received base64 audio: {len(audio_data)} chars, type: {mime_type}")
         elif isinstance(audio_data, bytes):
             logger.info(f"📊 Received binary audio: {len(audio_data)} bytes, type: {mime_type}")
         else:
             logger.error(f"❌ Unexpected audio data type: {type(audio_data)}")
-            await sio.emit("query-result", {"error": "Invalid audio format", "success": False}, to=sid)
+            await sio.emit("query-error", {"error": "Invalid audio format", "success": False}, to=sid)
             return
         
-        user_id = data.get("user_id")
-        if user_id is None:
-            logger.error(f"❌ User ID not found in payload for sid: {sid}")
-            await sio.emit("query-error", {"error": "User ID not found", "success": False}, to=sid)
-            user_id = "guest"
+        user_id = data.get("user_id", "guest")
         
-        # ✅ Send immediate acknowledgment to keep connection alive
         await sio.emit("processing", {"status": "Transcribing audio..."}, to=sid)
         
-        # Transcribe audio
+        # ✅ Only change: import from service
+        from app.services import transcribe_audio
         text = await transcribe_audio(audio_data, mime_type)
         
         logger.info(f"✅ Transcription result: '{text}'")
         
-        # ✅ Fixed logic bug (was: if(text != "" or text != "[No speech detected]"))
-        if text and text not in ["", "[No speech detected]", "[Transcription failed], [Empty audio file]"]:
-            # Send status update
+        # Fixed validation logic
+        if text and text not in ["", "[No speech detected]", "[Transcription failed]", "[Empty audio file]"]:
             await sio.emit("processing", {"status": "Getting response..."}, to=sid)
-            # Get chat response (run in thread if chat is synchronous)
-            chatRes = await chat(text, user_id)
-            dict_data = await serialize_response(chatRes)
             
-            # Send final result
-            await sio.emit(
-                "query-result",
-                {
-                    "result": text,
-                    "success": True,
-                    "data": dict_data
-                },
-                to=sid
-            )
-            logger.info(f"✅ Sent complete query-result to {sid}")
+            chat_res = await chat(text, user_id)  # type: ignore
+            dict_data = await serialize_response(chat_res)
+            
+            await sio.emit("query-result", {
+                "result": text,
+                "success": True,
+                "data": dict_data
+            }, to=sid)
+            
             logger.info(f"✅ Sent complete query-result to {sid}")
         else:
-            # No valid speech detected
-            await sio.emit(
-                "query-error",
-                {
-                    "result": text,
-                    "success": False,
-                    "message": "No speech detected or transcription failed"
-                },
-                to=sid
-            )
+            await sio.emit("query-error", {
+                "result": text,
+                "success": False,
+                "message": "No speech detected or transcription failed"
+            }, to=sid)
+            
             logger.info(f"⚠️ No valid speech for {sid}")
         
     except Exception as e:
-        logger.error(f"❌ Error in send_user_voice_query: {e}", exc_info=True)
-        await sio.emit(
-            "query-error",
-            {"error": str(e), "success": False},
-            to=sid
-        )
+        logger.error(f"❌ Error in send_user_voice_query_simple: {e}", exc_info=True)
+        await sio.emit("query-error", {"error": str(e), "success": False}, to=sid)

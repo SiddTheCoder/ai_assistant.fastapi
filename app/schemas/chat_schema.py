@@ -28,6 +28,7 @@ class ActionDetails(BaseModel):
 
 class ChatRequest(BaseModel):
     text: str = Field(..., min_length=1, max_length=2000)
+    user_id : str = "guest"
 
 class ChatResponse(BaseModel):
     userQuery: str  # Stores original user text

@@ -4,7 +4,7 @@ import os
 import logging
 
 # ✅ IMPORT WITH DIFFERENT NAME (avoid collision)
-from app.services.stt_service import transcribe_audio as process_audio
+from app.services.stt_services import transcribe_audio as process_audio
 
 router = APIRouter(prefix="/api")
 logger = logging.getLogger(__name__)

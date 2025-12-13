@@ -1,4 +1,5 @@
-from app.utils import clean_ai_response, load_user_from_redis
+from app.utils import clean_ai_response
+from app.cache.load_user import load_user 
 from app.ai.providers.manager import ProviderManager
 from typing import Optional
 from app.config import settings
@@ -39,7 +40,7 @@ async def chat(
     
     try:
         # --- Step 1: Load User Details ---
-        user_details = await load_user_from_redis.load_user(user_id)
+        user_details = await load_user(user_id)
 
         if not user_details:
             logger.error(f"❌ Could not load user details for {user_id}")

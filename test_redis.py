@@ -55,15 +55,15 @@ import asyncio
 # print(f"\nState: {state} found):")
 
 # set_user_details("user_1", {"name": "John Doe", "age": 30})
-# from app.utils.load_user_from_redis import load_user
+from app.utils.load_user_from_redis import load_user
 
-# async def hey():
-#   data = await load_user("692fdcf972c87e5123256ec0")
-#   # print("dtaa", data)
-#   set_user_details("guest", data)
+async def hey():
+  data = await load_user("692fdcf972c87e5123256ec0")
+  # print("dtaa", data)
+  set_user_details("guest", data)
 
-# asyncio.run(hey())
-update_user_details("guest", {"ai_gender": "female", "language": "hi"})
+asyncio.run(hey())
+# update_user_details("guest", {"ai_gender": "female", "language": "ne"})
 details = get_user_details("guest")
 # # if details:
 # #   set_user_details("guest", details)

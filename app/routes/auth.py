@@ -1,4 +1,5 @@
 from fastapi import APIRouter,Depends,Request
+from app.cache.redis.config import get_user_details, set_user_details, update_user_details
 from app.db.mongo import get_db
 from app.utils.serialize_mongo_doc import serialize_doc
 from app.models.user_model import UserModel , UserResponse
@@ -305,5 +306,10 @@ async def get_users():
 
 @router.get("/load_user")
 async def test_load_user_from_redis(user_id: str):
-    from app.utils.load_user_from_redis import load_user
-    return await load_user(user_id)
+    from app.cache.load_user import load_user
+    details = await load_user(user_id)
+    set_user_details("guest", details)
+    redis_user = get_user_details("guest")
+    updated_user = update_user_details("guest", {"ai_gender": "female", "language": "ne", "is_gemini_api_quota_reached": False})
+    print("details", details, "redis_user", redis_user, "updated_user", updated_user)
+    return updated_user
