@@ -76,7 +76,7 @@ def add_message(user_id: str, role: str, content: str) -> None:
         safe_warn(f"Failed to add message for user '{user_id}': {e}")
 
 
-def get_last_n_messages(user_id: str, n: int = 20) -> List[Dict[str, str]]:
+def get_last_n_messages(user_id: str, n: int = 10) -> List[Dict[str, str]]:
     """
     Get the last N messages from conversation history.
     

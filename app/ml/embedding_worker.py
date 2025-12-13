@@ -55,7 +55,7 @@ class EmbeddingWorker:
         if isinstance(texts, str):
             texts = [texts]
         
-        embeddings = self.model.encode( 
+        embeddings = self.model.encode(  # type: ignore
             texts,
             batch_size=batch_size,
             show_progress_bar=False,

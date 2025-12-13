@@ -181,7 +181,7 @@ class EmbeddingService:
         documents: List[Dict[str, Any]],
         text_key: str = "text",
         top_k: int = 10,
-        threshold: float = 0.5
+        threshold: float = 0.5,
     ) -> List[Dict[str, Any]]:
         """
         Semantic search over documents
@@ -230,12 +230,12 @@ class EmbeddingService:
         for idx, (doc, score) in enumerate(zip(documents, similarities)):
             if score >= threshold:
                 result = doc.copy()
-                result["_similarity_score"] = round(float(score), 4)
+                result["score"] = round(float(score), 4)
                 result["_rank"] = 0  # Will be set after sorting
                 results.append(result)
         
         # Sort by score (descending)
-        results.sort(key=lambda x: x["_similarity_score"], reverse=True)
+        results.sort(key=lambda x: x["score"], reverse=True)
         
         # Set ranks and limit to top_k
         for rank, result in enumerate(results[:top_k], 1):

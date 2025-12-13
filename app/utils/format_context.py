@@ -61,7 +61,9 @@ def format_context(recent_context: List[Dict], query_based_context: List[Dict]) 
     if query_based_context:
         query_formatted = []
         for ctx in query_based_context:
-            query = ctx.get('query', '')
+            # Try 'content' first as it is from redis, then 'query' as it is from pinecone
+            query = ctx.get('content', '')
+            if not query: query = ctx.get('query', '')
             relevance = ctx.get('score', 0)
             timestamp = ctx.get('timestamp', '')
             
