@@ -137,7 +137,7 @@ def search_user_queries(user_id: str, search_text: str, top_k: int = 5) -> List[
         return []
 
 
-def get_user_all_queries(user_id: str, top_k: int = 20) -> List[Dict[str, str]]:
+def get_user_all_queries(user_id: str, top_k: int = 10) -> List[Dict[str, str]]:
     """
     Get all queries for a specific user.
     Uses a generic search term to retrieve all records.

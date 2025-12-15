@@ -286,7 +286,7 @@ async def insert_keys(request:Request ,payload: auth_schema.APIKeys, user = Depe
 
     updated_user = serialize_doc(updated_user)
     print("updated_user",updated_user)
-    set_user_details(updated_user["_id"],updated_user)
+    await set_user_details(updated_user["_id"],updated_user)
     return send_response(
         request=request,
         data=updated_user,
@@ -308,8 +308,8 @@ async def get_users():
 async def test_load_user_from_redis(user_id: str):
     from app.cache.load_user import load_user
     details = await load_user(user_id)
-    set_user_details("guest", details)
-    redis_user = get_user_details("guest")
-    updated_user = update_user_details("guest", {"ai_gender": "female", "language": "ne", "is_gemini_api_quota_reached": False})
+    await set_user_details("guest", details)
+    redis_user = await get_user_details("guest")
+    updated_user = await update_user_details("guest", {"ai_gender": "female", "language": "hi", "is_gemini_api_quota_reached": False})
     print("details", details, "redis_user", redis_user, "updated_user", updated_user)
     return updated_user

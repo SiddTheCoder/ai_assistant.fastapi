@@ -1,15 +1,3 @@
-"""
-Multi-Layer User Cache: Memory → Redis → MongoDB
-Reduces user lookup from ~50ms to <1ms for cached users
-
-IMPORTANT: Memory cache is process-local. For multi-worker deployments,
-Redis remains the source of truth between processes.
-
-Performance Tiers:
-- Memory cache: <1ms (Python dict, per-process)
-- Redis cache: ~5-10ms (shared across processes)
-- MongoDB: ~30-50ms (database query)
-"""
 import logging
 from typing import Dict, Any, Optional, Tuple
 from datetime import datetime, timedelta
@@ -41,7 +29,7 @@ class UserCache:
     REDIS_TTL_SECONDS = 300  # 5 minutes for Redis cache
     
     @classmethod
-    def get_user(cls, user_id: str) -> Optional[Dict[str, Any]]:
+    async def get_user(cls, user_id: str) -> Optional[Dict[str, Any]]:
         """
         Get user from cache (sync version for backwards compatibility).
         
@@ -68,7 +56,8 @@ class UserCache:
         
         # ===== LAYER 2: Check Redis Cache =====
         logger.debug(f"🔍 Memory cache MISS, checking Redis for user {user_id}")
-        details = get_user_details(user_id)
+        details = await get_user_details(user_id)
+        print("tryitn to get user details from redis: froom load user",details)
         
         if details and details != {} and details != "null":
             # Found in Redis, store in memory for next time
@@ -103,7 +92,7 @@ class UserCache:
             return {}
         
         # Try cache layers first
-        cached_user = cls.get_user(user_id)
+        cached_user = await cls.get_user(user_id)
         if cached_user is not None:
             return cached_user
         
@@ -125,7 +114,7 @@ class UserCache:
             
             # CRITICAL: Store in both Redis and memory with the SAME key
             now = datetime.utcnow()
-            set_user_details(user_id, details)  # Redis
+            await set_user_details(user_id, details)  # Redis
             cls._memory_cache[user_id] = (details, now)  # Memory
             
             logger.info(f"✅ User {user_id} loaded from database and cached (memory + Redis)")
@@ -136,7 +125,7 @@ class UserCache:
             return {}
     
     @classmethod
-    def invalidate_user(cls, user_id: str):
+    async def invalidate_user(cls, user_id: str):
         """
         Invalidate user cache across all layers.
         
@@ -154,11 +143,11 @@ class UserCache:
             logger.debug(f"🗑️ Memory cache invalidated for user {user_id} (this process)")
         
         # Remove from Redis (affects all processes)
-        clear_user_details(user_id)
+        await clear_user_details(user_id)
         logger.info(f"🧹 Redis cache cleared for user {user_id} (affects all workers)")
     
     @classmethod
-    def update_user_field(cls, user_id: str, field: str, value: Any):
+    async def update_user_field(cls, user_id: str, field: str, value: Any):
         """
         Update a specific field in cached user data WITHOUT full reload.
         
@@ -179,10 +168,10 @@ class UserCache:
             logger.debug(f"✏️ Updated {field}={value} in memory cache for user {user_id}")
         
         # Update Redis (affects all processes)
-        redis_details = get_user_details(user_id)
+        redis_details = await get_user_details(user_id)
         if redis_details and redis_details != {} and redis_details != "null":
             redis_details[field] = value
-            set_user_details(user_id, redis_details)
+            await set_user_details(user_id, redis_details)
             logger.debug(f"✏️ Updated {field}={value} in Redis for user {user_id}")
         else:
             logger.warning(f"⚠️ Cannot update field {field} - user {user_id} not in Redis")
@@ -233,7 +222,7 @@ async def load_user(user_id: str) -> Dict[str, Any]:
     return await UserCache.load_user(user_id)
 
 
-def invalidate_user_cache(user_id: str):
+async def invalidate_user_cache(user_id: str):
     """
     Invalidate user cache when data changes.
     
@@ -252,10 +241,10 @@ def invalidate_user_cache(user_id: str):
             invalidate_user_cache(user_id)
         ```
     """
-    UserCache.invalidate_user(user_id)
+    await UserCache.invalidate_user(user_id)
 
 
-def update_user_quota_flag(user_id: str, provider: str, quota_reached: bool):
+async def update_user_quota_flag(user_id: str, provider: str, quota_reached: bool):
     """
     Hot-update quota flags without full cache invalidation.
     
@@ -269,7 +258,7 @@ def update_user_quota_flag(user_id: str, provider: str, quota_reached: bool):
         ```
     """
     field = f"is_{provider}_api_quota_reached"
-    UserCache.update_user_field(user_id, field, quota_reached)
+    await UserCache.update_user_field(user_id, field, quota_reached)
 
 
 # ============================================================================
@@ -319,7 +308,7 @@ def log_cache_performance():
 # TEST UTILITY (for debugging cache behavior)
 # ============================================================================
 
-def debug_cache_state(user_id: str):
+async def debug_cache_state(user_id: str):
     """
     Debug helper to check cache state for a specific user.
     
@@ -330,7 +319,7 @@ def debug_cache_state(user_id: str):
         - redis_data: Dict or None
     """
     in_memory = user_id in UserCache._memory_cache
-    redis_data = get_user_details(user_id)
+    redis_data = await get_user_details(user_id)
     in_redis = redis_data is not None and redis_data != {} and redis_data != "null"
     
     return {

@@ -1,12 +1,3 @@
-"""
-Multi-Layer User Cache: Memory → Redis → MongoDB
-Reduces user lookup from ~50ms to <1ms for cached users
-
-Performance Tiers:
-- Memory cache: <1ms (Python dict)
-- Redis cache: ~5-10ms (network call)
-- MongoDB: ~30-50ms (database query)
-"""
 import logging
 from typing import Dict, Any, Optional, Tuple
 from datetime import datetime, timedelta
@@ -35,7 +26,7 @@ class UserCache:
     REDIS_TTL_SECONDS = 300  # 5 minutes for Redis cache
     
     @classmethod
-    def get_user(cls, user_id: str) -> Optional[Dict[str, Any]]:
+    async def get_user(cls, user_id: str) -> Optional[Dict[str, Any]]:
         """
         Get user from cache (sync version for backwards compatibility).
         
@@ -62,7 +53,7 @@ class UserCache:
         
         # ===== LAYER 2: Check Redis Cache =====
         logger.debug(f"🔍 Memory cache MISS, checking Redis for user {user_id}")
-        details = get_user_details(user_id)
+        details = await get_user_details(user_id)
         
         if details and details != {} and details != "null":
             # Found in Redis, store in memory for next time
@@ -92,7 +83,7 @@ class UserCache:
         """
         
         # Try cache layers first
-        cached_user = cls.get_user(user_id)
+        cached_user = await cls.get_user(user_id)
         if cached_user is not None:
             return cached_user
         
@@ -114,7 +105,7 @@ class UserCache:
             
             # Store in both Redis and memory
             now = datetime.utcnow()
-            set_user_details(user_id, details)
+            await set_user_details(user_id, details)
             cls._memory_cache[user_id] = (details, now)
             
             logger.info(f"✅ User {user_id} loaded from database and cached")
@@ -125,7 +116,7 @@ class UserCache:
             return {}
     
     @classmethod
-    def invalidate_user(cls, user_id: str):
+    async def invalidate_user(cls, user_id: str):
         """
         Invalidate user cache across all layers.
         
@@ -140,11 +131,11 @@ class UserCache:
             logger.debug(f"🗑️ Memory cache invalidated for user {user_id}")
         
         # Remove from Redis
-        clear_user_details(user_id)
+        await clear_user_details(user_id)
         logger.info(f"🧹 All caches cleared for user {user_id}")
     
     @classmethod
-    def update_user_field(cls, user_id: str, field: str, value: Any):
+    async def update_user_field(cls, user_id: str, field: str, value: Any):
         """
         Update a specific field in cached user data.
         
@@ -163,10 +154,10 @@ class UserCache:
             logger.debug(f"✏️ Updated {field} in memory cache for user {user_id}")
         
         # Update Redis
-        redis_details = get_user_details(user_id)
+        redis_details = await get_user_details(user_id)
         if redis_details and redis_details != {} and redis_details != "null":
             redis_details[field] = value
-            set_user_details(user_id, redis_details)
+            await set_user_details(user_id, redis_details)
             logger.debug(f"✏️ Updated {field} in Redis for user {user_id}")
     
     @classmethod
@@ -208,7 +199,7 @@ async def load_user(user_id: str) -> Dict[str, Any]:
     return await UserCache.load_user(user_id)
 
 
-def invalidate_user_cache(user_id: str):
+async def invalidate_user_cache(user_id: str):
     """
     Invalidate user cache when data changes.
     
@@ -223,10 +214,10 @@ def invalidate_user_cache(user_id: str):
             invalidate_user_cache(user_id)
         ```
     """
-    UserCache.invalidate_user(user_id)
+    await UserCache.invalidate_user(user_id)
 
 
-def update_user_quota_flag(user_id: str, provider: str, quota_reached: bool):
+async def update_user_quota_flag(user_id: str, provider: str, quota_reached: bool):
     """
     Hot-update quota flags without full cache invalidation.
     
@@ -239,7 +230,7 @@ def update_user_quota_flag(user_id: str, provider: str, quota_reached: bool):
         ```
     """
     field = f"is_{provider}_api_quota_reached"
-    UserCache.update_user_field(user_id, field, quota_reached)
+    await UserCache.update_user_field(user_id, field, quota_reached)
 
 
 # ============================================================================

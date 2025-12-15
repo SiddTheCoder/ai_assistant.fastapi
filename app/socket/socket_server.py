@@ -96,24 +96,24 @@ async def serialize_response(chatRes) -> dict:
 async def request_tts(sid, data: RequestTTS):
     logger.info(f"⚡ request-tts from {sid}")
     data = model_parser.parse(RequestTTS, data)
-    await emit_server_status("TTS Request Received","Success", sid)
+    await emit_server_status("TTS Request Received","INFO", sid)
     try:
         # Validate payload
         if not data.text:
             await sio.emit("response-tts", {"success": False, "error": "Missing text"}, to=sid)
-            await emit_server_status("Error: Missing text","Error", sid)
+            await emit_server_status("Error: Missing text","ERROR", sid)
             return
         
         if not data.user_id:
             await sio.emit("response-tts", {"success": False, "error": "Missing user_id"}, to=sid)
-            await emit_server_status("Error: Missing user_id","Error", sid)
+            await emit_server_status("Error: Missing user_id","ERROR", sid)
             return
 
         # Load user preferences
         user = await load_user(data.user_id)
         gender = user.get("ai_gender", "").strip().lower()
         lang = user.get("language", "").strip().lower()
-        await emit_server_status(f"Loaded user preferences as gender={gender}, language={lang}","Success", sid)
+        await emit_server_status(f"Loaded user preferences as gender={gender}, language={lang}","INFO", sid)
 
         # Select voice
         if lang == "ne":
@@ -130,15 +130,16 @@ async def request_tts(sid, data: RequestTTS):
             sio=sio,
             sid=sid,
             text=data.text,
-            voice=voice
+            voice=voice,
+            rate="+10%"
         )
 
         if not success:
             await sio.emit("response-tts", {"success": False, "error": "TTS generation failed"}, to=sid)
-            await emit_server_status("Error: TTS generation failed","Error", sid)
+            await emit_server_status("Error: TTS generation failed","ERROR", sid)
             return
 
-        await emit_server_status("TTS generation completed successfully","Success", sid)
+        await emit_server_status("TTS generation completed successfully","INFO", sid)
     except Exception as e:
         logger.exception("TTS ERROR:")
         await sio.emit("response-tts", {"success": False, "error": str(e)}, to=sid)
@@ -178,13 +179,13 @@ async def send_user_voice_query(sid, data):
     """
     logger.info(f"🔥 Voice query (simple) triggered for sid: {sid}")
     
-    await emit_server_status("Backend Fired Up", "Success", sid)
-    await emit_server_status("Analyzing your data", "Success", sid)
+    await emit_server_status("Backend Fired Up", "INFO", sid)
+    await emit_server_status("Analyzing your data", "INFO", sid)
     
     if not data:
         logger.error(f"❌ No data received for sid: {sid}")
         await sio.emit("query-error", {"error": "No data received", "success": False}, to=sid)
-        await emit_server_status("Error: No data received", "Error", sid)
+        await emit_server_status("Error: No data received", "ERROR", sid)
         return
     
     try:
@@ -194,7 +195,7 @@ async def send_user_voice_query(sid, data):
         if not audio_data:
             logger.error(f"❌ No audio data in payload for sid: {sid}")
             await sio.emit("query-error", {"error": "No audio data", "success": False}, to=sid)
-            await emit_server_status("Audio data not received", "Error", sid)
+            await emit_server_status("Audio data not received", "ERROR", sid)
             return
         
         if isinstance(audio_data, str):

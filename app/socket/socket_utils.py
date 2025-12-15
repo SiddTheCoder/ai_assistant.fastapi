@@ -5,7 +5,7 @@ Import these functions anywhere you need to send real-time updates.
 
 from typing import Any, Optional, Dict, Literal
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -227,21 +227,9 @@ def get_user_by_sid(sid):
             return user_id
     return None
 
-# [06:59 AM], November 24th 2025
-def formatted_timestamp():
-    now = datetime.now()
-    day = now.day
-
-    # Create ordinal suffix
-    if 11 <= day <= 13:
-        suffix = "th"
-    else:
-        suffix = {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
-
-    return now.strftime(f"[%I:%M %p], %B {day}{suffix} %Y")
 
 
-async def emit_server_status(status: str, flag : str, sid: str) -> bool:
+async def emit_server_status(status: str, flag : Literal["INFO", "WARN", "ERROR"], sid: str) -> bool:
     """
     Emit a server status message to a specific user identified by session ID (sid).
 
@@ -259,9 +247,9 @@ async def emit_server_status(status: str, flag : str, sid: str) -> bool:
     return await socket_emit(
         "server-status",
         {
-            "flag" : "Success",
+            "flag" : flag,
             "status" : status,
-            "timestamp": formatted_timestamp()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         },
         user_id
     )

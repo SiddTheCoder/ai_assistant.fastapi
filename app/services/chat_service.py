@@ -39,7 +39,7 @@ async def chat(
         return _create_error_response("Empty query received", "neutral")
     
     try:
-        # --- Step 1: Load User Details ---
+        # --- Load User Details ---
         user_details = await load_user(user_id)
 
         if not user_details:
@@ -51,19 +51,19 @@ async def chat(
             )
         print("BYPASS 1 -  USER from redis",user_details)
 
-        # --- Step 2: Get Conversation Context ---
-        query_context, is_pinecone_needed = process_query_and_get_context(user_id, query, search_user_queries, get_user_all_queries, threshold=0.2)
+        # --- Get Query Based Context ---
+        query_context, is_pinecone_needed = await process_query_and_get_context(user_id, query)
 
         logger.info(f"Query context from chat_service: {json.dumps(query_context, indent=2)}")
 
-        # Get Local Context from redis
-        recent_context = get_last_n_messages(user_id, n=10)
+        # Get Recent Context from redis
+        recent_context = await get_last_n_messages(user_id, n=10)
         logger.info(f"Recent context from chat_service: {json.dumps(recent_context, indent=2)}")
 
-        # --- Step 3: Emotion Detection (placeholder) ---
+        # ---  Emotion Detection (placeholder) ---
         emotion = "neutral"
             
-        # --- Step 4: Build Prompt ---
+        # --- Build Prompt ---
         if user_details["language"] == "ne":
             prompt = app_prompt.build_prompt_ne(emotion, query, recent_context, query_context)
             logger.info(f"📝 Prompt built: {prompt[:200]}...")    
