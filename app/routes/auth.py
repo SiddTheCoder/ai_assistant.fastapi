@@ -1,8 +1,10 @@
-from fastapi import APIRouter,Depends,Request
+import json
+from typing import Any, Dict
+from fastapi import APIRouter, Body,Depends, Path, Query,Request
 from app.cache.redis.config import get_user_details, set_user_details, update_user_details
 from app.db.mongo import get_db
 from app.utils.serialize_mongo_doc import serialize_doc
-from app.models.user_model import UserModel , UserResponse
+from app.models.user_model import UserModel , UserResponse, UserUpdateQuery
 from app.schemas import auth_schema
 from app.dependencies.auth import get_current_user
 from app.jwt.config import create_access_token,create_refresh_token
@@ -269,6 +271,7 @@ async def login(request: Request, user: auth_schema.LoginData):
             errors=str(e)
         )
 
+
 # This route is for inserting api keys
 @router.post("/insert-api-keys")
 async def insert_keys(request:Request ,payload: auth_schema.APIKeys, user = Depends(get_current_user)):
@@ -294,15 +297,135 @@ async def insert_keys(request:Request ,payload: auth_schema.APIKeys, user = Depe
         status_code=200
     )
 
-@router.get("/me", response_model = UserResponse)
-def get_me(user = Depends(get_current_user)):
-    return serialize_doc(user)
+
+# This route is for updating user details
+@router.patch("/update-user-details")
+async def update_user_details_endpoint(
+    request: Request,
+    user_id: str = Query(
+        ...,
+        alias="userId",
+        max_length=24,
+        regex="^[a-f0-9]{24}$",
+    ),
+    payload: Dict[str, Any] = Body(...),
+    user=Depends(get_current_user)
+):
+    if not user:
+        return send_error("User not found", 404)
+
+    try:
+        object_id = ObjectId(user_id)
+    except Exception:
+        return send_error("Invalid user ID format", 400)
+
+    protected_fields = {
+        "_id",
+        "created_at",
+        "email",
+        "refresh_token",
+        "verification_token",
+        "verification_token_expires",
+        "session_count",
+    }
+
+    # Remove nulls & protected fields
+    update_data = {
+        k: v for k, v in payload.items()
+        if v is not None and k not in protected_fields
+    }
+
+    if not update_data:
+        return send_error("No valid fields to update", 400)
+    print("update fields", update_data)
+    # Optional validation against UserModel
+    valid_fields = set(UserModel.model_fields.keys())
+    print("valid fields", valid_fields)
+    invalid_fields = set(update_data.keys()) - valid_fields
+    if invalid_fields:
+        return send_error(
+            f"Invalid fields: {', '.join(invalid_fields)}",
+            400
+        )
+
+    update_data["last_active_at"] = datetime.now(timezone.utc).isoformat()
+    print("Updated data", update_data)
+
+    db = get_db()
+    updated_user = await db.users.find_one_and_update(
+        {"_id": object_id},
+        {"$set": update_data},
+        return_document=ReturnDocument.AFTER
+    )
+
+    if not updated_user:
+        return send_error("User not found", 404)
+
+    updated_user = serialize_doc(updated_user)
+    updated_user.pop("refresh_token", None)
+    updated_user.pop("verification_token", None)
+
+    return send_response(
+        request=request,
+        data=updated_user,
+        message="User updated successfully",
+        status_code=200
+    )
+
+
+## this route is for auto rotating the refresh and access_token
+@router.post("/refresh-token")
+async def refresh_access_token_endpoint(request: Request, body: auth_schema.RefreshTokenRequest):
+    refresh_token = body.refresh_token
+    if not refresh_token:
+        return send_error(message="Refresh token is required", status_code=400)
+    
+    from app.jwt import config as jwt_config
+    from jose.exceptions import JWTError, JWSError
+    
+    # Validate token format and decode with error handling
+    try:
+        jwt_doc = jwt_config.decode_token(refresh_token)
+    except (JWTError, JWSError, ValueError, Exception) as e:
+        # Token is malformed or invalid
+        return send_error(message="Invalid or malformed refresh token", status_code=401)
+
+    # Check if token is valid and is a refresh token
+    if not jwt_doc or jwt_doc.get("type") != "refresh":
+        return send_error(message="Invalid refresh token", status_code=401)
+
+    user_id = jwt_doc["sub"]
+    access_token = jwt_config.create_access_token(user_id)
+    new_refresh_token = jwt_config.create_refresh_token(user_id)
+    db = get_db()
+
+    await db.users.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$set": {"refresh_token": new_refresh_token}}
+    )    
+    
+    return send_response(
+        request=request,
+        data={
+            "access_token": access_token,
+            "refresh_token": "Refresh Token is not sent for security reasons but we have set it everywhere as needed. Contact us if you need it.",
+        },
+        access_token=access_token,
+        refresh_token=new_refresh_token,  # Fixed: should be new_refresh_token, not refresh_token
+        message="Token refreshed successfully",
+        status_code=200
+    )
+
+
+# get-user
+@router.get("")
 
 @router.get("/get-users")
 async def get_users():
     db = get_db()
     res = db.users.find({})
-    return serialize_doc(res)
+    print("users", res)
+    return res
 
 @router.get("/load_user")
 async def test_load_user_from_redis(user_id: str):
@@ -310,6 +433,6 @@ async def test_load_user_from_redis(user_id: str):
     details = await load_user(user_id)
     await set_user_details("guest", details)
     redis_user = await get_user_details("guest")
-    updated_user = await update_user_details("guest", {"ai_gender": "female", "language": "hi", "is_gemini_api_quota_reached": False})
+    updated_user = await update_user_details("guest", {"ai_gender": "male", "language": "hi", "is_gemini_api_quota_reached": False})
     print("details", details, "redis_user", redis_user, "updated_user", updated_user)
-    return updated_user
+    return details

@@ -69,7 +69,7 @@ class ProviderManager:
         
         return any(keyword in error_str for keyword in quota_keywords)
     
-    def call_with_fallback(
+    async def call_with_fallback(
         self,
         prompt: str,
         model_name: Optional[str] = None
@@ -103,14 +103,14 @@ class ProviderManager:
             
             except QuotaError as e:
                 logger.warning(f"🚨 Gemini quota exhausted for user {self.user_id}: {e}")
-                self._update_quota_status(ModelProvider.GEMINI, quota_reached=True)
+                await self._update_quota_status(ModelProvider.GEMINI, quota_reached=True)
                 # Fall through to OpenRouter
             
             except Exception as e:
                 logger.error(f"❌ Gemini failed (non-quota): {e}", exc_info=True)
                 # Check if it's actually a quota error disguised as generic error
                 if self._is_quota_error(e):
-                    self._update_quota_status(ModelProvider.GEMINI, quota_reached=True)
+                    await self._update_quota_status(ModelProvider.GEMINI, quota_reached=True)
                 # Fall through to OpenRouter
         
         else:
@@ -126,7 +126,7 @@ class ProviderManager:
             
             except QuotaError as e:
                 logger.error(f"🚨 OpenRouter quota exhausted for user {self.user_id}: {e}")
-                self._update_quota_status(ModelProvider.OPENROUTER, quota_reached=True)
+                await self._update_quota_status(ModelProvider.OPENROUTER, quota_reached=True)
                 raise Exception(
                     "All API quotas exhausted. Please add your own API keys in settings or try again later."
                 )
@@ -134,7 +134,7 @@ class ProviderManager:
             except Exception as e:
                 logger.error(f"❌ OpenRouter failed: {e}", exc_info=True)
                 if self._is_quota_error(e):
-                    self._update_quota_status(ModelProvider.OPENROUTER, quota_reached=True)
+                 await self._update_quota_status(ModelProvider.OPENROUTER, quota_reached=True)
                 raise Exception(f"OpenRouter API error: {str(e)}")
         
         else:
@@ -143,7 +143,7 @@ class ProviderManager:
                 "All API quotas exhausted. Please add your own API keys in settings or contact support."
             )
     
-    def _update_quota_status(self, provider: ModelProvider, quota_reached: bool):
+    async def _update_quota_status(self, provider: ModelProvider, quota_reached: bool):
         """
         Update quota status in Redis.
         
@@ -163,7 +163,7 @@ class ProviderManager:
                 self.user_details['is_openrouter_api_quota_reached'] = quota_reached
             
             # Persist to Redis
-            set_user_details(self.user_id, self.user_details)
+            await set_user_details(self.user_id, self.user_details)
             logger.info(f"✅ Updated {provider.value} quota status: {quota_reached}")
         
         except Exception as e:

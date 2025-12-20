@@ -14,3 +14,6 @@ class LoginData(BaseModel):
 class APIKeys(BaseModel):
   openrouter_api_key: str
   gemini_api_key: str  
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str  

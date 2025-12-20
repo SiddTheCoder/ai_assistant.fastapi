@@ -3,6 +3,7 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     openrouter_api_key: str
     gemini_api_key: str
+    ELEVEN_LABS_API_KEY: str
     gemini_model_name: str
     openrouter_light_model_name: str 
     openrouter_reasoning_model_name: str 

@@ -56,7 +56,24 @@ class UserModel(BaseModel):
     class Config:
         populate_by_name = True
 
+class UserUpdateQuery(BaseModel):
+    username: Optional[str] = None
+    email: Optional[EmailStr] = None
 
+    language: Optional[str] = None
+    ai_gender: Optional[str] = None
+    theme: Optional[str] = None
+    notifications_enabled: Optional[bool] = None
+    accepts_promotional_emails: Optional[bool] = None
+
+    categories_of_interest: Optional[List[str]] = None
+    favorite_brands: Optional[List[str]] = None
+
+    custom_attributes: Optional[Dict[str, Any]] = None
+
+    class Config:
+        populate_by_name = True
+        
 # Response model for API endpoints (excludes sensitive data)
 class UserResponse(BaseModel):
     username: Optional[str] = None

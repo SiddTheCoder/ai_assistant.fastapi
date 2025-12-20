@@ -4,10 +4,11 @@ from app.ai.providers.manager import ProviderManager
 from typing import Optional
 from app.config import settings
 # from app.services.detect_emotion import detect_emotion
-from app.db.pinecone.config import (get_user_all_queries,search_user_queries)
 from app.cache.redis.config import get_last_n_messages,process_query_and_get_context
 from app.prompts import app_prompt
 import json
+from app.controllers.chat_controllers import ChatController,add_chat_message_to_mongo
+import asyncio
 import logging
 
 logger = logging.getLogger(__name__)
@@ -79,7 +80,7 @@ async def chat(
 
         print("BYPASS 5 -  provide  manager",provider_manager)
         
-        raw_response, provider_used = provider_manager.call_with_fallback(
+        raw_response, provider_used = await provider_manager.call_with_fallback(
             prompt=prompt,
             model_name=model_name or settings.openrouter_reasoning_model_name
         )
@@ -100,6 +101,18 @@ async def chat(
         if hasattr(cleaned_response, 'answerDetails') and cleaned_response.answerDetails is not None and hasattr(cleaned_response.answerDetails, 'additional_info'):
             cleaned_response.answerDetails.additional_info['provider_used'] = provider_used.value
         print("cleaned response",cleaned_response)
+        
+        # Add chat message to MongoDB asynchronously
+        asyncio.create_task(
+         add_chat_message_to_mongo(
+            ChatController(
+                user_id=user_id,
+                user_query=query,
+                ai_response=cleaned_response.answerEnglish
+            )
+        ))
+
+
         return cleaned_response
     
     except Exception as e:
