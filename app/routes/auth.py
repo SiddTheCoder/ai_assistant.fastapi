@@ -1,4 +1,4 @@
-import json
+from fastapi.encoders import jsonable_encoder
 from typing import Any, Dict
 from fastapi import APIRouter, Body,Depends, Path, Query,Request
 from app.cache.redis.config import get_user_details, set_user_details, update_user_details
@@ -207,7 +207,7 @@ async def verify_otp_code(request: Request, data : auth_schema.VerifyTokenData):
     )
 
 
-@router.post("/login", response_model = UserResponse)
+@router.post("/sign-in", response_model = UserResponse)
 async def login(request: Request, user: auth_schema.LoginData):
     if not user.email or not is_valid_email(user.email):
         return send_error(
@@ -258,9 +258,10 @@ async def login(request: Request, user: auth_schema.LoginData):
             request=request,
             data={
                 "user": "Verification OTP Email Sent Successfully",
-                "emailStatus" : "Verification Token Sent"
+                "emailStatus" : "Verification Token Sent",
+                "user" :  user_doc
             },
-            message="User registered successfully",
+            message="User Signed In Successfully. Verify OTP to continue",
             status_code=201
         )
 
@@ -418,7 +419,20 @@ async def refresh_access_token_endpoint(request: Request, body: auth_schema.Refr
 
 
 # get-user
-@router.get("")
+@router.get("/get-me")
+async def get_me_endpoint(request: Request, user=Depends(get_current_user)):
+    print("user before serializing -------------- ", user)
+    user_model = UserResponse(**user)
+    print("user after model serializing -------------- ", user_model)
+
+    user_dict = jsonable_encoder(user_model)
+    print("user after jsonable_encoder -------------- ", user_dict)
+    return send_response (
+        request=request,
+        data=user_dict,
+        message="User details",
+        status_code=200
+    )
 
 @router.get("/get-users")
 async def get_users():

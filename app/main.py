@@ -29,7 +29,7 @@ async def lifespan(app: FastAPI):
     
     # Connect to database
     await connect_to_mongo()
-    await create_indexes()
+    await create_indexes() # type : ignore
     logger.info("✅ Database connected")
     
     # Initialize WebSocket
@@ -93,7 +93,7 @@ app = FastAPI(
 # Add CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production: ["https://yourfrontend.com"]
+    allow_origins=["*", "http://localhost:5123"],  # In production: ["https://yourfrontend.com"]
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

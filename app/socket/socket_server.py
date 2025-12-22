@@ -1,6 +1,6 @@
 import socketio
 import logging
-from typing import Dict
+from typing import Dict, Set
 from app.services.tts_services import tts_service
 import asyncio
 from app.config import settings
@@ -10,7 +10,9 @@ from app.cache.load_user import load_user
 from app.services.chat_service import chat
 from app.schemas.schemae import RequestTTS
 from app.helper import model_parser
+
 logger = logging.getLogger(__name__)
+from app.jwt import config as jwt
 
 # Create Socket.IO server with increased timeouts
 sio = socketio.AsyncServer(
@@ -19,53 +21,122 @@ sio = socketio.AsyncServer(
     logger=True,
     engineio_logger=True,
     namespaces=["/"],
-    ping_timeout=60,  # Wait 60s for ping response (default: 20s)
-    ping_interval=25,  # Send ping every 25s (default: 25s)
+    ping_timeout=60,
+    ping_interval=25,
 )
 
 # Create ASGI wrapper
 socket_app = socketio.ASGIApp(sio)
 
-# Store users
-connected_users: Dict[str, str] = {}
+# ✅ PRODUCTION-SAFE: Support multiple connections per user
+connected_users: Dict[str, Set[str]] = {}  # user_id → set of sids
 
 # ================= CONNECTION EVENTS ================= #
 
 @sio.event
-async def connect(sid, environ):
-    """Called when client connects"""
-    logger.info(f"🔌 Client connected: {sid}")
-    return True
+async def connect(sid, environ, auth):
+    """
+    Called when client connects
+    ✅ Authenticate with JWT and save user_id to session
+    """
+    token = auth.get("token", None)
+    if not token:
+        logger.warning(f"⚠️ No token provided by client")
+        raise ConnectionRefusedError("Missing auth token")
+    
+    try:
+        jwt_payload = jwt.decode_token(token)
+        user_id = jwt_payload.get("sub")
+        
+        if not user_id:
+            logger.warning(f"⚠️ Invalid token provided by client")
+            raise ConnectionRefusedError("Invalid auth token")
+        
+        # ✅ CRITICAL: Save user_id to socket session
+        await sio.save_session(sid, {
+            "user_id": user_id,
+            "authenticated": True
+        })
+        
+        # ✅ Track multiple connections per user
+        if user_id not in connected_users:
+            connected_users[user_id] = set()
+        connected_users[user_id].add(sid)
+        
+        logger.info(f"🟢 User {user_id} connected with sid {sid} (total connections: {len(connected_users[user_id])})")
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ Authentication error: {e}")
+        raise ConnectionRefusedError("Authentication failed")
 
 @sio.event
 async def disconnect(sid):
-    """Called when client disconnects"""
-    for uid, socket_id in list(connected_users.items()):
-        if socket_id == sid:
-            del connected_users[uid]
-            logger.info(f"👋 User {uid} disconnected")
-            break
-    
-    logger.info(f"🔌 Client {sid} disconnected")
+    """
+    Called when client disconnects
+    ✅ Clean up using session data
+    """
+    try:
+        # ✅ Get user_id from session (server-controlled)
+        session = await sio.get_session(sid)
+        user_id = session.get("user_id")
+        
+        if user_id and user_id in connected_users:
+            connected_users[user_id].discard(sid)
+            
+            # Clean up empty sets
+            if not connected_users[user_id]:
+                del connected_users[user_id]
+                logger.info(f"👋 User {user_id} fully disconnected (no active connections)")
+            else:
+                logger.info(f"🔌 User {user_id} disconnected sid {sid} ({len(connected_users[user_id])} connections remaining)")
+        else:
+            logger.info(f"🔌 Client {sid} disconnected (no user session)")
+            
+    except Exception as e:
+        logger.error(f"❌ Error during disconnect cleanup: {e}")
 
 @sio.event
 async def register_user(sid, user_id):
-    """User registers after connecting"""
-    try:
-        connected_users[user_id] = sid
-        logger.info(f"✅ User {user_id} registered with sid {sid}")
-        await sio.emit("registered", {"userId": user_id}, to=sid)
-    except Exception as e:
-        logger.error(f"❌ Error registering user: {e}")
+    """
+    ⚠️ DEPRECATED: User registration now happens automatically during connect
+    This event is kept for backward compatibility but does nothing
+    """
+    session = await sio.get_session(sid)
+    actual_user_id = session.get("user_id")
+    
+    logger.info(f"ℹ️ Received deprecated register_user event from {sid} (user already authenticated as {actual_user_id})")
+    await sio.emit("registered", {"userId": actual_user_id}, to=sid)
 
 # ================= HELPER FUNCTIONS ================= #
 
+async def get_user_from_session(sid: str) -> str:
+    """
+    ✅ Get authenticated user_id from socket session
+    Raises exception if not authenticated
+    """
+    try:
+        session = await sio.get_session(sid)
+        user_id = session.get("user_id")
+        
+        if not user_id:
+            raise ValueError("No user_id in session - socket not authenticated")
+        
+        return user_id
+    except Exception as e:
+        logger.error(f"❌ Failed to get user from session: {e}")
+        raise
+
 async def send_to_user(user_id: str, event: str, data: dict):
-    """Send event to a specific user"""
+    """
+    Send event to ALL connections of a specific user
+    ✅ Supports multi-device/multi-tab
+    """
     if user_id in connected_users:
-        sid = connected_users[user_id]
-        await sio.emit(event, data, to=sid)
-        logger.info(f"📤 Sent {event} to user {user_id}")
+        sids = connected_users[user_id]
+        for sid in sids:
+            await sio.emit(event, data, to=sid)
+        logger.info(f"📤 Sent {event} to user {user_id} ({len(sids)} connections)")
         return True
     else:
         logger.warning(f"⚠️ User {user_id} not connected")
@@ -92,28 +163,35 @@ async def serialize_response(chatRes) -> dict:
 
 # ==================== MESSAGING EVENTS ====================
 
-@sio.on("request-tts") #type: ignore
+@sio.on("request-tts")  # type: ignore
 async def request_tts(sid, data: RequestTTS):
+    """
+    ✅ Uses session-based authentication
+    ❌ No longer accepts user_id from client
+    """
     logger.info(f"⚡ request-tts from {sid}")
-    data = model_parser.parse(RequestTTS, data)
-    await emit_server_status("TTS Request Received","INFO", sid)
+    
     try:
+        # ✅ Get user_id from authenticated session
+        user_id = await get_user_from_session(sid)
+        print("user_id", user_id)
+        
+        data = model_parser.parse(RequestTTS, data)
+        print("data", data)
+        await emit_server_status("TTS Request Received", "INFO", sid)
+        
         # Validate payload
         if not data.text:
             await sio.emit("response-tts", {"success": False, "error": "Missing text"}, to=sid)
-            await emit_server_status("Error: Missing text","ERROR", sid)
-            return
-        
-        if not data.user_id:
-            await sio.emit("response-tts", {"success": False, "error": "Missing user_id"}, to=sid)
-            await emit_server_status("Error: Missing user_id","ERROR", sid)
+            await emit_server_status("Error: Missing text", "ERROR", sid)
             return
 
-        # Load user preferences
-        user = await load_user(data.user_id)
+        # Load user preferences using session user_id
+        user = await load_user(user_id)
+        print("user frmo load_user", user)
         gender = user.get("ai_gender", "").strip().lower()
         lang = user.get("language", "").strip().lower()
-        await emit_server_status(f"Loaded user preferences as gender={gender}, language={lang}","INFO", sid)
+        await emit_server_status(f"Loaded user preferences as gender={gender}, language={lang}", "INFO", sid)
 
         # Select voice
         if lang == "ne":
@@ -123,7 +201,7 @@ async def request_tts(sid, data: RequestTTS):
         else:
             voice = settings.eng_voice_male if gender == "male" else settings.eng_voice_female
 
-        logger.info(f"Using voice: {voice} for user: {data.user_id}")
+        logger.info(f"Using voice: {voice} for user: {user_id}")
 
         # Stream via service
         success = await tts_service.stream_to_socket(
@@ -136,21 +214,29 @@ async def request_tts(sid, data: RequestTTS):
 
         if not success:
             await sio.emit("response-tts", {"success": False, "error": "TTS generation failed"}, to=sid)
-            await emit_server_status("Error: TTS generation failed","ERROR", sid)
+            await emit_server_status("Error: TTS generation failed", "ERROR", sid)
             return
 
-        await emit_server_status("TTS generation completed successfully","INFO", sid)
+        await emit_server_status("TTS generation completed successfully", "INFO", sid)
+        
     except Exception as e:
         logger.exception("TTS ERROR:")
         await sio.emit("response-tts", {"success": False, "error": str(e)}, to=sid)
 
-@sio.on("send-user-text-query") #type: ignore
-async def send_user_text_query(sid, query):
-    """Handle text query from client"""
+@sio.on("send-user-text-query")  # type: ignore
+async def send_user_text_query(sid, data):
+    """
+    ✅ Uses session-based authentication
+    """
     logger.info(f"🔥 send_user_text_query triggered for sid: {sid}")
     
     try:
-        from app.services.chat_service import chat
+        # ✅ Get user_id from authenticated session
+        user_id = await get_user_from_session(sid)
+        
+        query = data.get("query") if isinstance(data, dict) else data
+        if not query :
+            raise ValueError("No query provided")
         
         # If chat is synchronous, run it in a thread so it can be awaited safely
         chatRes = await asyncio.to_thread(chat, query)
@@ -174,21 +260,24 @@ async def send_user_text_query(sid, query):
 @sio.on("send-user-voice-query")  # type: ignore
 async def send_user_voice_query(sid, data):
     """
-    Simplified version - minimal changes from your original
-    Just uses the service layer
+    ✅ Uses session-based authentication
+    ❌ No longer trusts user_id from client
     """
-    logger.info(f"🔥 Voice query (simple) triggered for sid: {sid}")
-    
-    await emit_server_status("Backend Fired Up", "INFO", sid)
-    await emit_server_status("Analyzing your data", "INFO", sid)
-    
-    if not data:
-        logger.error(f"❌ No data received for sid: {sid}")
-        await sio.emit("query-error", {"error": "No data received", "success": False}, to=sid)
-        await emit_server_status("Error: No data received", "ERROR", sid)
-        return
+    logger.info(f"🔥 Voice query triggered for sid: {sid}")
     
     try:
+        # ✅ Get user_id from authenticated session
+        user_id = await get_user_from_session(sid)
+        
+        await emit_server_status("Backend Fired Up", "INFO", sid)
+        await emit_server_status("Analyzing your data", "INFO", sid)
+        
+        if not data:
+            logger.error(f"❌ No data received for sid: {sid}")
+            await sio.emit("query-error", {"error": "No data received", "success": False}, to=sid)
+            await emit_server_status("Error: No data received", "ERROR", sid)
+            return
+        
         audio_data = data.get("audio")
         mime_type = data.get("mimeType", "audio/webm")
         
@@ -207,20 +296,18 @@ async def send_user_voice_query(sid, data):
             await sio.emit("query-error", {"error": "Invalid audio format", "success": False}, to=sid)
             return
         
-        user_id = data.get("user_id", "guest")
-        
         await sio.emit("processing", {"status": "Transcribing audio..."}, to=sid)
         
-        # ✅ Only change: import from service
-        from app.services import transcribe_audio
+        # Transcribe audio
         text = await transcribe_audio(audio_data, mime_type)
         
         logger.info(f"✅ Transcription result: '{text}'")
         
-        # Fixed validation logic
+        # Validate transcription
         if text and text not in ["", "[No speech detected]", "[Transcription failed]", "[Empty audio file]"]:
             await sio.emit("processing", {"status": "Getting response..."}, to=sid)
             
+            # ✅ Use session user_id (not from client payload)
             chat_res = await chat(text, user_id)  # type: ignore
             dict_data = await serialize_response(chat_res)
             
@@ -241,5 +328,5 @@ async def send_user_voice_query(sid, data):
             logger.info(f"⚠️ No valid speech for {sid}")
         
     except Exception as e:
-        logger.error(f"❌ Error in send_user_voice_query_simple: {e}", exc_info=True)
+        logger.error(f"❌ Error in send_user_voice_query: {e}", exc_info=True)
         await sio.emit("query-error", {"error": str(e), "success": False}, to=sid)
