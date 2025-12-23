@@ -1,6 +1,6 @@
 from fastapi.encoders import jsonable_encoder
 from typing import Any, Dict
-from fastapi import APIRouter, Body,Depends, Path, Query,Request
+from fastapi import APIRouter, Body,Depends,  Query,Request
 from app.cache.redis.config import get_user_details, set_user_details, update_user_details
 from app.db.mongo import get_db
 from app.utils.serialize_mongo_doc import serialize_doc

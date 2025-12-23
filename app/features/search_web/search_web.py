@@ -3,7 +3,7 @@ import sys
 import time
 import subprocess
 import webbrowser
-from app.features.web_features.fetch_web_result import fetch_web_results_with_selenium
+from app.features.search_web.fetch_web_result import fetch_web_results_with_selenium
 import logging
 
 logger = logging.getLogger(__name__)
