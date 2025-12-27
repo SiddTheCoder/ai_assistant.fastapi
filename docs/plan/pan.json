@@ -372,3 +372,11 @@ Task-optimized path 👇
     "on_failure": "abort"
   }
 }
+
+✅ Correct design
+Component	Responsibility
+Orchestrator	task ordering, mapping, dispatch
+TaskExecutor	run ONE task
+MappingResolver	resolve JSONPath
+ExecutionState	store truth
+ToolAdapter	actual side effects

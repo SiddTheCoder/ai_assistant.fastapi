@@ -330,3 +330,5 @@ async def send_user_voice_query(sid, data):
     except Exception as e:
         logger.error(f"❌ Error in send_user_voice_query: {e}", exc_info=True)
         await sio.emit("query-error", {"error": str(e), "success": False}, to=sid)
+
+__all__ = ["sio"]        

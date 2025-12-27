@@ -21,7 +21,8 @@
             "data": {
               "process_id": { "type": "integer" },
               "launch_time": { "type": "string" }
-            }
+            },
+            "error": { "type": "string" }
           },
           "metadata": {
             "default_confidence": 0.98,
@@ -42,7 +43,8 @@
             "data": {
               "exit_code": { "type": "integer" },
               "closed_at": { "type": "string" }
-            }
+            },
+            "error": { "type": "string" }
           },
           "metadata": {
             "default_confidence": 0.95,
@@ -69,7 +71,8 @@
               "old_process_id": { "type": "integer" },
               "new_process_id": { "type": "integer" },
               "restart_time": { "type": "string" }
-            }
+            },
+            "error": { "type": "string" }
           },
           "metadata": {
             "default_confidence": 0.92,
@@ -96,7 +99,8 @@
               "ram_percent": { "type": "number" },
               "disk_percent": { "type": "number" },
               "timestamp": { "type": "string" }
-            }
+            },
+            "error": { "type": "string" }
           },
           "metadata": {
             "default_confidence": 0.99,
@@ -116,7 +120,8 @@
               "is_charging": { "type": "boolean" },
               "time_remaining": { "type": "string" },
               "health": { "type": "string" }
-            }
+            },
+            "error": { "type": "string" }
           },
           "metadata": {
             "default_confidence": 0.99,
@@ -142,7 +147,8 @@
               "local_ip": { "type": "string" },
               "public_ip": { "type": "string" },
               "network_name": { "type": "string" }
-            }
+            },
+            "error": { "type": "string" }
           },
           "metadata": {
             "default_confidence": 0.97,
@@ -160,7 +166,8 @@
             "data": {
               "content": { "type": "string" },
               "content_type": { "type": "string" }
-            }
+            },
+            "error": { "type": "string" }
           },
           "metadata": {
             "default_confidence": 0.99,
@@ -180,7 +187,8 @@
             "data": {
               "content_length": { "type": "integer" },
               "copied_at": { "type": "string" }
-            }
+            },
+            "error": { "type": "string" }
           },
           "metadata": {
             "default_confidence": 0.99,
@@ -206,7 +214,8 @@
             "data": {
               "notification_id": { "type": "string" },
               "sent_at": { "type": "string" }
-            }
+            },
+            "error": { "type": "string" }
           },
           "metadata": {
             "default_confidence": 0.98,
@@ -233,7 +242,8 @@
               "in_clipboard": { "type": "boolean" },
               "resolution": { "type": "string" },
               "captured_at": { "type": "string" }
-            }
+            },
+            "error": { "type": "string" }
           },
           "metadata": {
             "default_confidence": 0.96,
@@ -266,7 +276,8 @@
               "results": { "type": "array" },
               "total_found": { "type": "integer" },
               "search_time_ms": { "type": "number" }
-            }
+            },
+            "error": { "type": "string" }
           },
           "metadata": {
             "default_confidence": 0.94,
@@ -288,7 +299,8 @@
               "file_path": { "type": "string" },
               "opened_with": { "type": "string" },
               "opened_at": { "type": "string" }
-            }
+            },
+            "error": { "type": "string" }
           },
           "metadata": {
             "default_confidence": 0.97,
@@ -315,7 +327,8 @@
               "file_path": { "type": "string" },
               "size_bytes": { "type": "integer" },
               "created_at": { "type": "string" }
-            }
+            },
+            "error": { "type": "string" }
           },
           "metadata": {
             "default_confidence": 0.95,
@@ -342,7 +355,8 @@
               "deleted_path": { "type": "string" },
               "permanent": { "type": "boolean" },
               "deleted_at": { "type": "string" }
-            }
+            },
+            "error": { "type": "string" }
           },
           "metadata": {
             "default_confidence": 0.9,
@@ -370,7 +384,8 @@
               "old_path": { "type": "string" },
               "new_path": { "type": "string" },
               "moved_at": { "type": "string" }
-            }
+            },
+            "error": { "type": "string" }
           },
           "metadata": {
             "default_confidence": 0.93,
@@ -399,7 +414,8 @@
               "destination_path": { "type": "string" },
               "size_bytes": { "type": "integer" },
               "copied_at": { "type": "string" }
-            }
+            },
+            "error": { "type": "string" }
           },
           "metadata": {
             "default_confidence": 0.96,
@@ -413,6 +429,7 @@
           "execution_target": "client",
           "params_schema": {
             "path": { "type": "string", "required": true },
+            "title": { "type": "string", "required": false, "default": "" },
             "recursive": {
               "type": "boolean",
               "required": false,
@@ -424,7 +441,8 @@
             "data": {
               "folder_path": { "type": "string" },
               "created_at": { "type": "string" }
-            }
+            },
+            "error": { "type": "string" }
           },
           "metadata": {
             "default_confidence": 0.98,
@@ -446,7 +464,8 @@
               "files_affected": { "type": "integer" },
               "action_performed": { "type": "string" },
               "cleaned_at": { "type": "string" }
-            }
+            },
+            "error": { "type": "string" }
           },
           "metadata": {
             "default_confidence": 0.88,
@@ -479,7 +498,8 @@
               "results": { "type": "array" },
               "total_results": { "type": "integer" },
               "search_time_ms": { "type": "number" }
-            }
+            },
+            "error": { "type": "string" }
           },
           "metadata": {
             "default_confidence": 0.95,
