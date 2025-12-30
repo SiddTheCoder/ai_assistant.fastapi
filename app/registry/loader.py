@@ -12,6 +12,7 @@ from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
+_TOOL_REGISTRY = {}
 
 @dataclass
 class ToolMetadata:
@@ -114,6 +115,8 @@ class ToolRegistry:
     
     def get_tool(self, tool_name: str) -> Optional[ToolMetadata]:
         """Get tool metadata by name"""
+        if tool_name not in self.tools:
+            return None
         return self.tools.get(tool_name)
     
     def validate_tool(self, tool_name: str) -> bool:

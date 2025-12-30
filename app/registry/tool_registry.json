@@ -497,7 +497,8 @@
             "data": {
               "results": { "type": "array" },
               "total_results": { "type": "integer" },
-              "search_time_ms": { "type": "number" }
+              "search_time_ms": { "type": "number" },
+              "summary": { "type": "string" }
             },
             "error": { "type": "string" }
           },

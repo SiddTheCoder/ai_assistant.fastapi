@@ -162,7 +162,8 @@ class ExecutionEngine:
         """
         Execute multiple server tasks in parallel
         
-        This is where server tasks actually run!
+        ✅ Uses REAL ServerToolExecutor (injected at startup)
+        Each task calls actual tool adapters (web_search, api_call, etc.)
         """
         if not self.server_tool_executor:
             logger.error("❌ No server tool executor configured!")
@@ -189,24 +190,25 @@ class ExecutionEngine:
             # Show lifecycle message
             if task.lifecycle_messages and task.lifecycle_messages.on_start:
                 logger.info(f"     💬 {task.lifecycle_messages.on_start}")
-            
-            # Check if executor is available
-            if not self.server_tool_executor:
-                raise RuntimeError("Server tool executor not configured")
+
+            # Check if executor is available 
+            if not self.server_tool_executor: 
+                raise RuntimeError("Server tool executor not configured")    
             
             # Get timeout
             timeout = None
             if task.control and task.control.timeout_ms:
                 timeout = task.control.timeout_ms / 1000
             
-            # Execute the tool
+            # ✅ Execute the tool using REAL ServerToolExecutor
+            # This calls the actual tool adapters (web_search, etc.)
             if timeout:
                 output = await asyncio.wait_for(
-                    self.server_tool_executor.execute(task),
+                    self.server_tool_executor.execute(task),  # ← REAL executor!
                     timeout=timeout
                 )
             else:
-                output = await self.server_tool_executor.execute(task)
+                output = await self.server_tool_executor.execute(task)  # ← REAL executor!
             
             # Mark completed
             await self.orchestrator.mark_task_completed(user_id, task.task_id, output)
@@ -218,7 +220,7 @@ class ExecutionEngine:
             logger.info(f"  ✅ Completed: {task.task_id} ({task.duration_ms}ms)")
         
         except asyncio.TimeoutError:
-            error = f"Task timed out after {timeout if timeout else 'unknown'}s" # type: ignore
+            error = f"Task timed out after {timeout}s" # type: ignore
             await self.orchestrator.mark_task_failed(user_id, task.task_id, error)
             
             if task.lifecycle_messages and task.lifecycle_messages.on_failure:
@@ -233,22 +235,37 @@ class ExecutionEngine:
     
     async def _emit_client_batch(self, user_id: str, tasks: list[TaskRecord]) -> None:
         """
-        Emit multiple client tasks
+        Emit client tasks in batches
         
-        Tasks are sent via WebSocket to client
+        ✅ SMART BATCHING:
+        - If tasks are independent → Emit separately (parallel on client)
+        - If tasks are chained (A→B→C all client) → Emit as batch (client handles locally)
+        
+        This makes client execution snappy!
         """
         if not self.client_task_emitter:
             logger.error("❌ No client task emitter configured!")
             return
         
-        for task in tasks:
+        # Group tasks by dependency chains
+        independent_tasks = []
+        chained_batches = self._group_chained_tasks(tasks)
+        
+        # Emit chained batches (client handles dependencies locally)
+        for chain in chained_batches:
+            if len(chain) > 1:
+                logger.info(f"  📦 Emitting chained batch: {[t.task_id for t in chain]}")
+                await self.client_task_emitter.emit_task_batch(user_id, chain)
+            else:
+                independent_tasks.extend(chain)
+        
+        # Emit independent tasks separately
+        for task in independent_tasks:
             try:
-                # Show lifecycle message
                 if task.lifecycle_messages and task.lifecycle_messages.on_start:
                     logger.info(f"     💬 {task.lifecycle_messages.on_start}")
                 
-                # Emit to client
-                success = await self.client_task_emitter.emit_task_to_client(user_id, task)
+                success = await self.client_task_emitter.emit_task_single(user_id, task)
                 
                 if success:
                     logger.info(f"  📤 Emitted: {task.task_id} ({task.tool})")
@@ -257,6 +274,54 @@ class ExecutionEngine:
             
             except Exception as e:
                 logger.error(f"  ❌ Error emitting {task.task_id}: {e}")
+    
+    def _group_chained_tasks(self, tasks: list[TaskRecord]) -> list[list[TaskRecord]]:
+        """
+        Group tasks by dependency chains
+        
+        Example:
+        - task1 (no deps)
+        - task2 (depends on task1)
+        - task3 (depends on task2)
+        
+        Returns: [[task1, task2, task3]]
+        
+        This allows client to handle entire chain locally!
+        """
+        if not tasks:
+            return []
+        
+        chains = []
+        task_map = {t.task_id: t for t in tasks}
+        processed = set()
+        
+        for task in tasks:
+            if task.task_id in processed:
+                continue
+            
+            # Build chain starting from this task
+            chain = [task]
+            processed.add(task.task_id)
+            
+            # Look for tasks that depend on this one
+            current_id = task.task_id
+            while True:
+                found_dependent = False
+                for other_task in tasks:
+                    if other_task.task_id not in processed:
+                        if current_id in other_task.depends_on:
+                            chain.append(other_task)
+                            processed.add(other_task.task_id)
+                            current_id = other_task.task_id
+                            found_dependent = True
+                            break
+                
+                if not found_dependent:
+                    break
+            
+            chains.append(chain)
+        
+        return chains
     
     async def _print_final_summary(self, user_id: str):
         """Print execution summary at the end"""

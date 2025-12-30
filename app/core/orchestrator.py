@@ -95,8 +95,12 @@ class TaskOrchestrator:
         """
         Get batch of tasks ready to execute
         
-        Returns:
-            TaskBatch with separate lists for server and client tasks
+        ✅ SMART BATCHING:
+        - Returns immediately runnable tasks
+        - For client chains (C→C→C), returns ENTIRE chain at once
+        - For server tasks, returns only ready ones
+        
+        This allows client to handle entire dependency chains locally!
         """
         async with self._get_lock(user_id):
             state = self.states.get(user_id)
@@ -108,15 +112,28 @@ class TaskOrchestrator:
             
             # Find all pending tasks
             pending_tasks = state.get_tasks_by_status("pending")
+            processed_task_ids = set()
             
             for task in pending_tasks:
+                if task.task_id in processed_task_ids:
+                    continue
+                
                 # Check if dependencies are met
                 if self._are_dependencies_met(state, task.task_id):
-                    # Route by execution target
                     if task.execution_target == "server":
+                        # Server tasks: add individually
                         batch.server_tasks.append(task)
+                        processed_task_ids.add(task.task_id)
+                    
                     elif task.execution_target == "client":
-                        batch.client_tasks.append(task)
+                        # ✅ CLIENT SMART LOGIC:
+                        # If this starts a client chain, include ENTIRE chain!
+                        chain = self._get_client_chain_from_task(state, task, pending_tasks)
+                        batch.client_tasks.extend(chain)
+                        
+                        # Mark all in chain as processed
+                        for chain_task in chain:
+                            processed_task_ids.add(chain_task.task_id)
             
             logger.info(
                 f"📦 Batch for {user_id}: "
@@ -125,6 +142,81 @@ class TaskOrchestrator:
             )
             
             return batch
+    
+    def _get_client_chain_from_task(
+        self, 
+        state: ExecutionState, 
+        start_task: TaskRecord,
+        all_pending: List[TaskRecord]
+    ) -> List[TaskRecord]:
+        """
+        Get entire client chain starting from a task
+        
+        ✅ KEY FEATURE: Returns entire C→C→C chain at once!
+        
+        Example:
+        - start_task: create_folder (no deps, runnable)
+        - Finds: write_file (depends on create_folder)
+        - Finds: copy_file (depends on write_file)
+        - Returns: [create_folder, write_file, copy_file]
+        
+        Client handles all three locally! 🚀
+        """
+        chain = [start_task]
+        pending_map = {t.task_id: t for t in all_pending}
+        current_id = start_task.task_id
+        
+        # Look ahead for tasks that depend on current chain
+        while True:
+            found_next = False
+            
+            for pending_task in all_pending:
+                if pending_task.task_id in [t.task_id for t in chain]:
+                    continue  # Already in chain
+                
+                # Check if this task:
+                # 1. Is a client task
+                # 2. Depends on current task
+                # 3. All its other deps are either:
+                #    - Server tasks (already completed)
+                #    - Tasks in current chain
+                if pending_task.execution_target != "client":
+                    continue
+                
+                if current_id not in pending_task.depends_on:
+                    continue
+                
+                # Check if ALL deps are satisfied
+                can_add_to_chain = True
+                chain_ids = {t.task_id for t in chain}
+                
+                for dep_id in pending_task.depends_on:
+                    # Dep must be either:
+                    # - In current chain, OR
+                    # - A completed server task
+                    if dep_id not in chain_ids:
+                        dep_task = state.get_task(dep_id)
+                        if not dep_task or dep_task.status != "completed":
+                            can_add_to_chain = False
+                            break
+                        # If it's completed but client, can't add
+                        if dep_task.execution_target == "client":
+                            can_add_to_chain = False
+                            break
+                
+                if can_add_to_chain:
+                    chain.append(pending_task)
+                    current_id = pending_task.task_id
+                    found_next = True
+                    break
+            
+            if not found_next:
+                break
+        
+        if len(chain) > 1:
+            logger.info(f"   🔗 Found client chain: {[t.task_id for t in chain]}")
+        
+        return chain
     
     def _are_dependencies_met(self, state: ExecutionState, task_id: str) -> bool:
         """

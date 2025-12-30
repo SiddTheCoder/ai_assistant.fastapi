@@ -24,7 +24,7 @@ class SocketTaskHandler:
         self.connected_users = connected_users
         self.orchestrator = get_orchestrator()
     
-    async def emit_task_to_client(self, user_id: str, task: TaskRecord) -> bool:
+    async def emit_task_single(self, user_id: str, task: TaskRecord) -> bool:
         """
         Emit a task to the client for execution
         
@@ -94,7 +94,7 @@ class SocketTaskHandler:
         success_count = 0
         
         for task in tasks:
-            if await self.emit_task_to_client(user_id, task):
+            if await self.emit_task_single(user_id, task):
                 success_count += 1
         
         logger.info(f"📤 Emitted {success_count}/{len(tasks)} tasks to {user_id}")
