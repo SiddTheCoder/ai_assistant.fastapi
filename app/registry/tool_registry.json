@@ -497,6 +497,33 @@
             "data": {
               "results": { "type": "array" },
               "total_results": { "type": "integer" },
+              "search_time_ms": { "type": "number" }
+            },
+            "error": { "type": "string" }
+          },
+          "metadata": {
+            "default_confidence": 0.95,
+            "default_requires_approval": false,
+            "default_timeout_ms": 5000
+          }
+        },
+        {
+          "tool_name": "web_scrape",
+          "description": "Fetches and extracts readable content from a public webpage",
+          "execution_target": "server",
+          "params_schema": {
+            "query": { "type": "string", "required": true },
+            "max_results": {
+              "type": "integer",
+              "required": false,
+              "default": 10
+            }
+          },
+          "output_schema": {
+            "success": { "type": "boolean" },
+            "data": {
+              "results": { "type": "array" },
+              "total_results": { "type": "integer" },
               "search_time_ms": { "type": "number" },
               "summary": { "type": "string" }
             },

@@ -1,4 +1,4 @@
-def fetch_web_results_with_selenium(query, limit=5):
+async def fetch_web_results_with_selenium(query, limit=5):
     """
     Fetch Google search results using Selenium with headless Chrome.
     """
@@ -10,7 +10,7 @@ def fetch_web_results_with_selenium(query, limit=5):
     import time
     
     options = Options()
-    options.add_argument("--headless")
+    # options.add_argument("--headless")
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
@@ -126,4 +126,40 @@ def fetch_web_results_with_selenium(query, limit=5):
         if driver:
             driver.quit()
     
+    return results
+
+async def fetch_bing_results_with_selenium(query, limit=5):
+    from selenium import webdriver
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.chrome.options import Options
+    from selenium.webdriver.chrome.service import Service
+    from webdriver_manager.chrome import ChromeDriverManager
+    import time
+
+    options = Options()
+    options.add_argument("--headless=new")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--no-sandbox")
+
+    driver = webdriver.Chrome(
+        service=Service(ChromeDriverManager().install()),
+        options=options
+    )
+
+    driver.get(f"https://www.bing.com/search?q={query.replace(' ', '+')}")
+    time.sleep(4)
+
+    results = []
+    items = driver.find_elements(By.CSS_SELECTOR, "li.b_algo")
+
+    for item in items[:limit]:
+        try:
+            title = item.find_element(By.TAG_NAME, "h2").text
+            url = item.find_element(By.TAG_NAME, "a").get_attribute("href")
+            snippet = item.find_element(By.CLASS_NAME, "b_caption").text
+            results.append({"title": title, "url": url, "snippet": snippet})
+        except:
+            continue
+
+    driver.quit()
     return results

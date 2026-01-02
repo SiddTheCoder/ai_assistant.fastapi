@@ -49,7 +49,7 @@ class ExecutionEngine:
         """Inject client task emitter"""
         self.client_task_emitter = emitter
     
-    async def start_execution(self, user_id: str) -> None:
+    async def start_execution(self, user_id: str) -> asyncio.Task:
         """
         Start execution engine for a user (non-blocking)
         
@@ -61,7 +61,7 @@ class ExecutionEngine:
             existing = self.running_engines[user_id]
             if not existing.done():
                 logger.info(f"⚠️  Execution already running for {user_id}")
-                return
+                return existing
         
         # Start new background task
         task = asyncio.create_task(
@@ -70,6 +70,8 @@ class ExecutionEngine:
         self.running_engines[user_id] = task
         
         logger.info(f"🚀 Started execution engine for user: {user_id}")
+
+        return task
     
     async def _execution_loop(self, user_id: str) -> None:
         """
@@ -111,6 +113,7 @@ class ExecutionEngine:
                             running = state.get_tasks_by_status("running")
                             
                             if pending or running:
+                                logger.info(f"⏳ Still have {len(pending)} pending, {len(running)} running")
                                 logger.info(f"⏳ Tasks still pending/running, continuing...")
                                 no_work_count = 0  # Reset
                                 await asyncio.sleep(1)
@@ -237,7 +240,7 @@ class ExecutionEngine:
         """
         Emit client tasks in batches
         
-        ✅ SMART BATCHING:
+        SMART BATCHING:
         - If tasks are independent → Emit separately (parallel on client)
         - If tasks are chained (A→B→C all client) → Emit as batch (client handles locally)
         
@@ -245,7 +248,14 @@ class ExecutionEngine:
         """
         if not self.client_task_emitter:
             logger.error("❌ No client task emitter configured!")
-            return
+            # MARK TASKS AS FAILED!
+            for task in tasks:
+                await self.orchestrator.mark_task_failed(
+                    user_id,
+                    task.task_id,
+                    "Client task emitter not configured"
+                )
+            return 
         
         # Group tasks by dependency chains
         independent_tasks = []

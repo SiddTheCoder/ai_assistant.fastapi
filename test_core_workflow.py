@@ -25,7 +25,7 @@ from app.core.models import Task
 from app.tools.loader import load_all_tools
 
 
-async def main():
+async def test_core_workflow():
     logger.info("\n" + "=" * 70)
     logger.info("COMPLETE EXECUTION FLOW TEST")
     logger.info("=" * 70 + "\n")
@@ -60,14 +60,14 @@ async def main():
             tool="web_search",
             execution_target="server",
             depends_on=[],
-            inputs={"query": "gold"},
+            inputs={"query": "today gold price"},
         ),
         Task(
             task_id="search1",
             tool="web_search",
             execution_target="server",
-            depends_on=["search0"],
-            inputs={"query": "news"},
+            depends_on=[],
+            inputs={"query": "who is siddthecoder"},
         ),
         Task(
             task_id="create_folder",
@@ -94,20 +94,10 @@ async def main():
 
     # Step 5: Start execution (NON-BLOCKING)
     logger.info("Step 5: Starting execution engine...")
-    await execution_engine.start_execution(user_id)
-    logger.info("✅ Execution started in background!\n")
-
-    logger.info("=" * 70)
-    logger.info("WATCHING EXECUTION (engine runs automatically)")
-    logger.info("=" * 70 + "\n")
-
+    engine_task = await execution_engine.start_execution(user_id)
     # Step 6: Wait for completion
-    await asyncio.sleep(3)
-
-    # Final status
-    logger.info("\n" + "=" * 70)
-    logger.info("CHECKING FINAL STATUS")
-    logger.info("=" * 70 + "\n")
+    await engine_task
+    logger.info("✅ Execution started in background!\n")
 
     summary = await orchestrator.get_execution_summary(user_id)
     logger.info(f"Total: {summary['total']}")
@@ -142,7 +132,7 @@ async def main():
 
     logger.info(
         json.dumps(
-            orchestrator.get_state(user_id).model_dump(),
+            orchestrator.get_state(user_id).model_dump(), # type: ignore
             indent=2,
             ensure_ascii=False,
             default=str,
@@ -155,4 +145,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(test_core_workflow())

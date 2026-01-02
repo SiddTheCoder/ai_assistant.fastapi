@@ -20,11 +20,23 @@ Matches tool_registry.json:
 }
 """
 
+
 import asyncio
 from typing import Dict, Any
 from datetime import datetime
 
 from app.tools.base import BaseTool, ToolOutput
+
+# web searcher duckduckgo
+from ddgs import DDGS
+import re
+
+BLOCKED_DOMAINS = (
+    "baidu.com",
+    "zhihu.com",
+    "weibo.com",
+    "csdn.net"
+)
 
 
 class WebSearchTool(BaseTool):
@@ -72,24 +84,59 @@ class WebSearchTool(BaseTool):
         # Simulate search delay
         await asyncio.sleep(0.5)
         
-        # Mock results
-        # In production: Call actual search API
-        results = self._mock_search(query, max_results)
-        
-        # Format results
-        formatted = self._format_results(query, results)
-        
+        # Run search
+        init_time = datetime.now()
+        results = await self._fetch_web_results(query, max_results)
+        search_time_ms = (datetime.now() - init_time).total_seconds() * 1000    
         return ToolOutput(
             success=True,
             data={
-                "query": query,
                 "results": results,
                 "total_results": len(results),
-                "search_time_ms": 500,
-                "formatted_results": formatted  # Human-readable
-            }
+                "search_time_ms": search_time_ms
+            },
+            error=None
         )
-    
+
+    def _looks_english(self ,text: str) -> bool:
+        # Reject if contains CJK characters
+        return not re.search(r"[\u4e00-\u9fff]", text)
+
+    async def _fetch_web_results(self, query: str, limit: int = 5):
+        results = []
+
+        with DDGS() as ddgs:
+            for r in ddgs.text(
+                query,
+                max_results=limit * 3,   # fetch extra, filter later
+                region="us-en",
+                safesearch="low"
+            ):
+                title = r.get("title", "")
+                snippet = r.get("body", "")
+                url = r.get("href", "")
+
+                if not url.startswith("http"):
+                    continue
+
+                if any(d in url for d in BLOCKED_DOMAINS):
+                    continue
+
+                if not self._looks_english(title + snippet):
+                    continue
+
+                results.append({
+                    "title": title,
+                    "url": url,
+                    "snippet": snippet
+                })
+
+                if len(results) >= limit:
+                    break
+
+        return results
+
+# testing 
     def _mock_search(self, query: str, max_results: int) -> list[Dict[str, Any]]:
         """
         Mock search results
@@ -164,46 +211,4 @@ class WebSearchTool(BaseTool):
         
         return "\n".join(lines)
 
-
-# ========================================
-# PRODUCTION INTEGRATION EXAMPLE
-# ========================================
-
-"""
-For production, replace _mock_search with real API:
-
-async def _search_with_serpapi(self, query: str, max_results: int):
-    import aiohttp
     
-    params = {
-        "q": query,
-        "num": max_results,
-        "api_key": os.getenv("SERPAPI_KEY")
-    }
-    
-    async with aiohttp.ClientSession() as session:
-        async with session.get("https://serpapi.com/search", params=params) as resp:
-            data = await resp.json()
-            return data.get("organic_results", [])
-
-Or use Brave Search:
-
-async def _search_with_brave(self, query: str, max_results: int):
-    import aiohttp
-    
-    headers = {
-        "Accept": "application/json",
-        "X-Subscription-Token": os.getenv("BRAVE_API_KEY")
-    }
-    
-    params = {"q": query, "count": max_results}
-    
-    async with aiohttp.ClientSession() as session:
-        async with session.get(
-            "https://api.search.brave.com/res/v1/web/search",
-            headers=headers,
-            params=params
-        ) as resp:
-            data = await resp.json()
-            return data.get("web", {}).get("results", [])
-"""
