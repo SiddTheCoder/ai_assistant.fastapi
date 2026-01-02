@@ -1,11 +1,12 @@
-from app.utils import clean_ai_response
+from app.utils import clean_ai_response, clean_phq_response
 from app.cache.load_user import load_user 
 from app.ai.providers.manager import ProviderManager
 from typing import Optional
 from app.config import settings
 # from app.services.detect_emotion import detect_emotion
 from app.cache.redis.config import get_last_n_messages,process_query_and_get_context
-from app.prompts import app_prompt
+from app.prompts import pqh_prompt
+from app.registry.tool_index import get_tools_index
 import json
 from app.controllers.chat_controllers import ChatController,add_chat_message_to_mongo
 import asyncio
@@ -63,16 +64,20 @@ async def chat(
 
         # ---  Emotion Detection (placeholder) ---
         emotion = "neutral"
+
+        # ---- get tools index ----
+        tools_index = get_tools_index()
+        print("BYPASS 2 -  tools index",len(tools_index))
             
         # --- Build Prompt ---
         if user_details["language"] == "ne":
-            prompt = app_prompt.build_prompt_ne(emotion, query, recent_context, query_context)
+            prompt = pqh_prompt.build_prompt_ne(emotion, query, recent_context, query_context, tools_index)
             logger.info(f"📝 Prompt built: {prompt[:200]}...")    
         elif user_details["language"] == "hi":
-            prompt = app_prompt.build_prompt_hi(emotion, query, recent_context, query_context)
+            prompt = pqh_prompt.build_prompt_hi(emotion, query, recent_context, query_context, tools_index)
             logger.info(f"📝 Prompt built: {prompt[:200]}...")
         else:
-            prompt = app_prompt.build_prompt_en(emotion, query, recent_context, query_context)
+            prompt = pqh_prompt.build_prompt_en(emotion, query, recent_context, query_context, tools_index)
             logger.info(f"📝 Prompt built: {prompt[:200]}...")
 
         # --- Step 5: Call AI with Smart Fallback ---
@@ -91,16 +96,11 @@ async def chat(
         logger.info(f"✅ Response received from {provider_used.value}")
         
         if not raw_response:
-            return _create_error_response("Empty AI response", emotion)
+            return clean_phq_response._create_error_pqh_response("Empty AI response", emotion)
         
-    # --- Step 6: Clean and Return Response ---
-        cleaned_response = clean_ai_response.clean_ai_response(raw_response)
+        # --- Step 6: Clean and Return Response ---
+        cleaned_response = clean_phq_response.clean_pqh_response(raw_response, emotion)
         print("cleaned response before ",cleaned_response)
-        
-        # Add metadata about which provider was used
-        if hasattr(cleaned_response, 'answerDetails') and cleaned_response.answerDetails is not None and hasattr(cleaned_response.answerDetails, 'additional_info'):
-            cleaned_response.answerDetails.additional_info['provider_used'] = provider_used.value
-        print("cleaned response",cleaned_response)
         
         # Add chat message to MongoDB asynchronously
         asyncio.create_task(
@@ -108,11 +108,10 @@ async def chat(
             ChatController(
                 user_id=user_id,
                 user_query=query,
-                ai_response=cleaned_response.answerEnglish
+                ai_response=cleaned_response.cognitive_state.answerEnglish
             )
         ))
-
-
+        
         return cleaned_response
     
     except Exception as e:

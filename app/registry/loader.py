@@ -56,6 +56,10 @@ class ToolRegistry:
             registry_path: Path to tool_registry.json
         """
         try:
+            if self.tools:
+                logger.warning("Tool registry already loaded. Skipping reload.")
+                return
+            
             path = Path(registry_path)
             print("path", path)
             
