@@ -15,7 +15,7 @@ class CognitiveState(BaseModel):
     thought_process: str
     answer: str
     answerEnglish: str
-
+ 
 class PQHResponse(BaseModel):
     request_id: str
     cognitive_state: CognitiveState  # Fixed typo: coginitive -> cognitive

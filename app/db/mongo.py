@@ -14,7 +14,7 @@ async def connect_to_mongo():
     try:
         client = AsyncIOMotorClient(settings.mongo_uri)
         db = client[settings.db_name]
-        logging.info("✅ Async MongoDB connected")
+        print("✅ Async MongoDB connected")
 
     except Exception as e:
         logging.error(f"❌ MongoDB connection failed: {e}")
@@ -26,7 +26,7 @@ async def close_mongo_connection():
 
     if client:
         client.close()
-        logging.info("✅ MongoDB connection closed")
+        print("✅ MongoDB connection closed")
 
 
 def get_db():

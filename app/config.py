@@ -16,6 +16,10 @@ class Settings(BaseSettings):
     word_matching_threshold: float = 0.35
     ai_name: str = "SPARK"
     mongo_uri : str 
+    upstash_redis_rest_url : str
+    upstash_redis_rest_token : str
+    # environment : str = "production"
+    environment : str = "development"
     db_name : str = "spark"
     nep_voice_male : str = "ne-NP-SagarNeural"
     nep_voice_female : str = "ne-NP-HemkalaNeural"

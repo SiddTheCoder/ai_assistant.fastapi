@@ -16,9 +16,7 @@ class UserCache:
     Layer 1: In-memory dict (fastest, <1ms, per-process)
     Layer 2: Redis (fast, ~5-10ms, shared across processes)
     Layer 3: MongoDB (slowest, ~30-50ms)
-    
-    NOTE: Memory cache is NOT shared between processes/workers!
-    Each Gunicorn/Uvicorn worker has its own memory cache.
+
     """
     
     # In-memory cache: {user_id: (user_details, cached_at)}

@@ -1,18 +1,30 @@
 from app.db.mongo import get_db
+from pymongo.errors import PyMongoError
 import logging
 
 async def create_indexes():
-    db = get_db()
+    try:
+        db = get_db()
 
-    # CHATS COLLECTION
-    await db.chats.create_index([("user_id",1), ("created_at",-1)])
+        await db.chats.create_index(
+            [("user_id", 1), ("created_at", -1)],
+            background=True
+        )
 
-    # # SOCKET LOGS
-    # await db.socket_logs.create_index("socket_id")
-    # await db.socket_logs.create_index("timestamp")
+        await db.memory.create_index(
+            "user_id",
+            background=True
+        )
 
-    # MEMORY
-    await db.memory.create_index("user_id")
-    await db.memory.create_index("importance")
+        await db.memory.create_index(
+            "importance",
+            background=True
+        )
 
-    logging.info("✅ MongoDB indexes created")
+        logging.info("✅ MongoDB indexes created")
+
+    except PyMongoError as e:
+        logging.error(f"⚠️ MongoDB index creation failed: {e}")
+
+    except Exception as e:
+        logging.error(f"⚠️ Unexpected error while creating indexes: {e}")

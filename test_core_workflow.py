@@ -138,6 +138,18 @@ async def test_core_workflow():
             default=str,
         )
     )
+    logger.info("\n" + "=" * 70)
+
+    logger.info(
+        json.dumps(
+            orchestrator.get_task(user_id, "search0").model_dump(), # type: ignore
+            indent=2,
+            ensure_ascii=False,
+            default=str,
+        )
+    )
+
+    
 
     logger.info("\n" + "=" * 70)
     logger.info("TEST COMPLETE!")
