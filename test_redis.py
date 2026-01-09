@@ -13,13 +13,13 @@ async def main():
     # await config.add_message("user123", "ai", "Not much!")
     from app.db.mongo import connect_to_mongo
     await connect_to_mongo()
-    doc = await config.get_last_n_messages("guest",5)
-    print(json.dumps(doc, indent=4))
-    plain, a = format_context(doc, [])
-    print(plain)
+    # doc = await config.get_last_n_messages("guest",5)
+    # print(json.dumps(doc, indent=4))
+    # plain, a = format_context(doc, [])
+    # print(plain)
 
     from app.services.chat_service import chat
-    response = await chat("what did you just said?", user_id="guest")
+    response = await chat("Who is kartik and aashish?", user_id="guest")
     print("Chat Response:", response)
 
 

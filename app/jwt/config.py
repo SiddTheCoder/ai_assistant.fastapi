@@ -3,9 +3,9 @@ from jose import jwt
 import hashlib
 from passlib.context import CryptContext
 
-SECRET_KEY = "your-secret-key"
+SECRET_KEY = "spark-secret-key-for-jwt-token-signing-123456"
 ALGO = "HS256"
-ISSUER = "spark-api"
+ISSUER = "Spark Industries"
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 

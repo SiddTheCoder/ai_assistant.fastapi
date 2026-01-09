@@ -20,22 +20,14 @@ async def chat(
     model_name: Optional[str] = None
 ) -> clean_pqh_response.PQHResponse:
     """
-    Main chat function with smart AI provider fallback.
-    
-    Flow:
-    1. Load user details (API keys, quota status)
-    2. Get conversation context
-    3. Build prompt
-    4. Call AI with automatic Gemini → OpenRouter fallback
-    5. Return cleaned response
-    
+    Main entry point for the chat service as PQH - Primary Query Handler.
     Args:
         query: User's message
         user_id: User identifier
         model_name: Optional model name for OpenRouter fallback
     
     Returns:
-        ChatResponse with AI answer
+        clean_pqh_response.PQHResponse: Structured response from the AI
     """
     if not query or not query.strip():
         return _create_error_response("Empty query received", "neutral")
@@ -55,12 +47,11 @@ async def chat(
 
         # --- Get Query Based Context ---
         query_context, is_pinecone_needed = await process_query_and_get_context(user_id, query)
-
-        logger.info(f"Query context from chat_service: {json.dumps(query_context, indent=2)}")
+        print(f"Query context from chat_service: {json.dumps(query_context, indent=2)}")
 
         # Get Recent Context from redis
         recent_context = await get_last_n_messages(user_id, n=10)
-        logger.info(f"Recent context from chat_service: {json.dumps(recent_context, indent=2)}")
+        print(f"Recent context from chat_service: {json.dumps(recent_context, indent=2)}")
 
         # ---  Emotion Detection (placeholder) ---
         emotion = "neutral"
@@ -72,13 +63,13 @@ async def chat(
         # --- Build Prompt ---
         if user_details["language"] == "ne":
             prompt = pqh_prompt.build_prompt_ne(emotion, query, recent_context, query_context, tools_index)
-            logger.info(f"📝 Prompt built: {prompt[:200]}...")    
+            print(f"📝 Prompt built: {prompt[:200]}...")    
         elif user_details["language"] == "hi":
             prompt = pqh_prompt.build_prompt_hi(emotion, query, recent_context, query_context, tools_index)
-            logger.info(f"📝 Prompt built: {prompt[:200]}...")
+            print(f"📝 Prompt built: {prompt[:200]}...")
         else:
             prompt = pqh_prompt.build_prompt_en(emotion, query, recent_context, query_context, tools_index)
-            logger.info(f"📝 Prompt built: {prompt[:200]}...")
+            print(f"📝 Prompt built: {prompt[:200]}...")
 
         # --- Step 5: Call AI with Smart Fallback ---
         provider_manager = ProviderManager(user_details)
@@ -93,7 +84,7 @@ async def chat(
         print("BYPASS 5 -  raw response",raw_response)
         print("BYPASS 5 -  provider used",provider_used)
         
-        logger.info(f"✅ Response received from {provider_used.value}")
+        print(f"✅ Response received from {provider_used.value}")
         
         if not raw_response:
             return clean_pqh_response._create_error_pqh_response("Empty AI response", emotion)
