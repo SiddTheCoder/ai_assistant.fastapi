@@ -35,8 +35,8 @@ async def lifespan(app: FastAPI):
     logger.info("🚀 Application starting up...")
     logger.info("=" * 60)
     
-    # ✅ NEW: Load Tool Registry FIRST
-    logger.info("\n📦 Loading Tool Registry...")
+    # Load Tool Registry FIRST
+    logger.info("\n Loading Tool Registry...")
     try:
         load_tool_registry()
         registry = get_tool_registry()
@@ -45,10 +45,10 @@ async def lifespan(app: FastAPI):
         logger.error(f"❌ Failed to load tool registry: {e}")
         raise
     
-    # ✅ NEW: Initialize Orchestrator
-    logger.info("\n🎯 Initializing Task Orchestration System...")
+    # Initialize Orchestrator
+    logger.info("\n Initializing Task Orchestration System...")
     try:
-        orchestrator = init_orchestrator()
+        init_orchestrator()
         logger.info("✅ Task Orchestrator initialized")
         
         # Initialize Server Executor
@@ -61,12 +61,12 @@ async def lifespan(app: FastAPI):
         
         # Initialize Execution Engine
         execution_engine = init_execution_engine()
-        logger.info("✅ Execution Engine initialized")
+        logger.info("Execution Engine initialized")
         
         # Wire them together
         execution_engine.set_server_executor(server_executor)
         execution_engine.set_client_emitter(task_handler)
-        logger.info("✅ Components wired together")
+        logger.info("Components wired together")
         
     except Exception as e:
         logger.error(f"❌ Failed to initialize orchestration: {e}")
@@ -75,52 +75,52 @@ async def lifespan(app: FastAPI):
     # Connect to database
     await connect_to_mongo()
     await create_indexes()
-    logger.info("✅ Database connected")
+    logger.info(" Database connected")
     
     # Initialize WebSocket
     logger.info("📡 WebSocket server available at /ws")
     init_socket_utils(sio, connected_users)
-    logger.info("✅ WebSocket initialized")
+    logger.info(" WebSocket initialized")
     
     # Load ML models
     logger.info("=" * 60)
-    logger.info(f"🤖 Loading ML models on device: {DEVICE}")
+    logger.info(f" Loading ML models on device: {DEVICE}")
     logger.info("=" * 60)
     
     success = model_loader.load_all_models()
     
     if success:
-        logger.info("✅ All ML models loaded successfully")
+        logger.info(" All ML models loaded successfully")
         model_loader.warmup_models()
-        logger.info("✅ Models warmed up - no cold start!")
+        logger.info(" Models warmed up - no cold start!")
     else:
         logger.warning("⚠️  Some ML models failed to load - check logs")
     
     logger.info("=" * 60)
-    logger.info("✅ Application startup complete")
-    logger.info("🚀 Server is ready to handle requests!")
+    logger.info(" Application startup complete")
+    logger.info(" Server is ready to handle requests!")
     logger.info("=" * 60)
     
     yield  # Application is running
     
     # ========== SHUTDOWN ==========
     logger.info("=" * 60)
-    logger.info("👋 Application shutting down...")
+    logger.info(" Application shutting down...")
     logger.info("=" * 60)
     
     # Cleanup database
     await close_mongo_connection()
-    logger.info("✅ Database disconnected")
+    logger.info(" Database disconnected")
     
     # Cleanup ML resources
     embedding_worker.shutdown()
     model_loader.unload_all_models()
-    logger.info("✅ ML models unloaded")
+    logger.info(" ML models unloaded")
     
     # Cleanup other resources
     from app.utils.async_utils import cleanup_executor
     cleanup_executor()
-    logger.info("✅ Application shutdown complete")
+    logger.info(" Application shutdown complete")
     logger.info("=" * 60)
 
 

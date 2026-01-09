@@ -1,10 +1,10 @@
-from app.utils import clean_ai_response, clean_phq_response
+from app.utils import  clean_pqh_response
 from app.cache.load_user import load_user 
 from app.ai.providers.manager import ProviderManager
 from typing import Optional
 from app.config import settings
 # from app.services.detect_emotion import detect_emotion
-from app.cache.redis.config import get_last_n_messages,process_query_and_get_context
+from app.cache.redis.config import get_last_n_messages,process_query_and_get_context,add_message as redis_add_message
 from app.prompts import pqh_prompt
 from app.registry.tool_index import get_tools_index
 import json
@@ -18,7 +18,7 @@ async def chat(
     query: str,
     user_id: str = "guest",
     model_name: Optional[str] = None
-):
+) -> clean_pqh_response.PQHResponse:
     """
     Main chat function with smart AI provider fallback.
     
@@ -96,12 +96,20 @@ async def chat(
         logger.info(f"✅ Response received from {provider_used.value}")
         
         if not raw_response:
-            return clean_phq_response._create_error_pqh_response("Empty AI response", emotion)
+            return clean_pqh_response._create_error_pqh_response("Empty AI response", emotion)
         
         # --- Step 6: Clean and Return Response ---
-        cleaned_response = clean_phq_response.clean_pqh_response(raw_response, emotion)
+        cleaned_response = clean_pqh_response.clean_pqh_response(raw_response, emotion)
         print("cleaned response before ",cleaned_response)
         
+        # Add ai response to Redis asynchronously
+        asyncio.create_task(
+            redis_add_message(
+                user_id=user_id,
+                role="ai",
+                content=cleaned_response.cognitive_state.answerEnglish
+            )
+        )
         # Add chat message to MongoDB asynchronously
         asyncio.create_task(
          add_chat_message_to_mongo(
@@ -111,6 +119,7 @@ async def chat(
                 ai_response=cleaned_response.cognitive_state.answerEnglish
             )
         ))
+
         
         return cleaned_response
     
@@ -123,34 +132,15 @@ async def chat(
 
 def _create_error_response(message: str, emotion: str, query: str = ""):
     """Helper to create fallback error responses with all required fields."""
-    from app.schemas.chat_schema import ChatResponse, ActionDetails, Confirmation, AnswerDetails
-    
-    return ChatResponse(
-        userQuery=query,  # ✅ Added missing field
-        answer=message,
-        answerEnglish=message,  # ✅ Added missing field (same as answer for errors)
-        actionCompletedMessage="",  # ✅ Added missing field (empty for errors)
-        actionCompletedMessageEnglish="",  # ✅ Added missing field (empty for errors)
-        action="",
-        emotion=emotion,
-        answerDetails=AnswerDetails(
-            content="",
-            sources=[],
-            references=[],
-            additional_info={}
-        ),
-        actionDetails=ActionDetails(
-            type="",
-            query="",
-            title="",
-            artist="",
-            topic="",
-            platforms=[],
-            app_name="",
-            target="",
-            location="",
-            searchResults=[],  # Make sure this is also in your schema
-            confirmation=Confirmation(isConfirmed=False, actionRegardingQuestion=""),
-            additional_info={}
-        )
+   
+    return clean_pqh_response.PQHResponse(
+       request_id="error_response",
+       cognitive_state=clean_pqh_response.CognitiveState(
+              userQuery=query,
+              emotion=emotion,
+              thought_process="Error occurred while processing the request.",
+              answer=message,
+              answerEnglish=message
+         ),
+         requested_tool=[]
     )

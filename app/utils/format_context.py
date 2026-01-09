@@ -15,6 +15,7 @@ def format_context(recent_context: List[Dict], query_based_context: List[Dict]) 
         for ctx in recent_context: 
             content = ctx.get('content', '')
             timestamp = ctx.get('timestamp', '')
+            role = ctx.get('role', '')
             
             time_str = ""
             relative_time = ""
@@ -49,9 +50,9 @@ def format_context(recent_context: List[Dict], query_based_context: List[Dict]) 
                     relative_time = ""
             
             if relative_time:
-                recent_formatted.append(f"[{time_str}] {content} ({relative_time})")
+                recent_formatted.append(f"[{time_str}] {content} ({relative_time}) - {role}")
             else:
-                recent_formatted.append(f"[{time_str}] {content}")
+                recent_formatted.append(f"[{time_str}] {content} - {role}")
         
         recent_str = "\n".join(recent_formatted)
     else:
@@ -66,6 +67,7 @@ def format_context(recent_context: List[Dict], query_based_context: List[Dict]) 
             if not query: query = ctx.get('query', '')
             relevance = ctx.get('score', 0)
             timestamp = ctx.get('timestamp', '')
+            
             
             time_str = ""
             relative_time = ""
