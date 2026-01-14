@@ -18,8 +18,8 @@ class Settings(BaseSettings):
     mongo_uri : str 
     upstash_redis_rest_url : str
     upstash_redis_rest_token : str
-    # environment : str = "production"
-    environment : str = "development"
+    environment : str = "production"
+    # environment : str = "development"
     db_name : str = "spark"
     nep_voice_male : str = "ne-NP-SagarNeural"
     nep_voice_female : str = "ne-NP-HemkalaNeural"

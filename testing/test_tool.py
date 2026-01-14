@@ -5,7 +5,7 @@ def main():
   load_tool_registry()
   registry = get_tool_registry()
   data = registry.get_tool("web_search")
-  print("data as params shcema",data.params_schema)
-  print("data as output shcema",data.output_schema)
+  print("data as params schema",data.params_schema)
+  print("data as output schema",data.output_schema)
 
 main()  
