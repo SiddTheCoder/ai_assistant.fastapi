@@ -70,6 +70,7 @@ class WebSearchTool(BaseTool):
         """
         # Extract inputs
         query = inputs.get("query", "")
+        print("inputs: inside search.py", inputs)
         max_results = inputs.get("max_results", 10)
         
         if not query:
@@ -91,6 +92,7 @@ class WebSearchTool(BaseTool):
         return ToolOutput(
             success=True,
             data={
+                "query_demo": query,
                 "results": results,
                 "total_results": len(results),
                 "search_time_ms": search_time_ms

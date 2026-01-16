@@ -5,6 +5,7 @@ Production-Grade Task Orchestrator
 - Dependency analysis
 - Parallel execution support
 - Server/Client task routing
+- FIXED: Returns entire client chains in one batch
 """
 
 import asyncio
@@ -30,7 +31,7 @@ class TaskOrchestrator:
     - Store per-user execution state
     - Analyze dependencies
     - Route server/client tasks
-    - Coordinate parallel execution
+    - Return executable batches WITH client chains detected
     """
     
     def __init__(self):
@@ -67,7 +68,7 @@ class TaskOrchestrator:
             
             state = self.states[user_id]
             
-            logger.info(f"📥 Registering {len(tasks)} tasks for user {user_id}")
+            logger.info(f"🔥 Registering {len(tasks)} tasks for user {user_id}")
             
             for task in tasks:
                 # Validate tool exists
@@ -93,14 +94,12 @@ class TaskOrchestrator:
     
     async def get_executable_batch(self, user_id: str) -> TaskBatch:
         """
-        Get batch of tasks ready to execute
+        Get batch of tasks ready to execute RIGHT NOW
         
-        ✅ SMART BATCHING:
-        - Returns immediately runnable tasks
-        - For client chains (C→C→C), returns ENTIRE chain at once
-        - For server tasks, returns only ready ones
+        ✅ FIXED: Returns entire CLIENT CHAINS in one batch!
         
-        This allows client to handle entire dependency chains locally!
+        For client tasks, if A→B→C are all client and A is ready,
+        returns ALL THREE so engine can batch them together.
         """
         async with self._get_lock(user_id):
             state = self.states.get(user_id)
@@ -109,31 +108,36 @@ class TaskOrchestrator:
                 return TaskBatch()
             
             batch = TaskBatch()
+            processed_ids = set()
             
             # Find all pending tasks
             pending_tasks = state.get_tasks_by_status("pending")
-            processed_task_ids = set()
             
             for task in pending_tasks:
-                if task.task_id in processed_task_ids:
+                if task.task_id in processed_ids:
                     continue
                 
                 # Check if dependencies are met
-                if self._are_dependencies_met(state, task.task_id):
-                    if task.execution_target == "server":
-                        # Server tasks: add individually
-                        batch.server_tasks.append(task)
-                        processed_task_ids.add(task.task_id)
+                if not self._are_dependencies_met(state, task.task_id):
+                    continue
+                
+                if task.execution_target == "server":
+                    # Server tasks: add individually
+                    batch.server_tasks.append(task)
+                    processed_ids.add(task.task_id)
+                
+                elif task.execution_target == "client":
+                    # ✅ CLIENT CHAIN OPTIMIZATION:
+                    # If this starts a chain, include entire chain!
+                    chain = self._get_client_chain_from_task(state, task, pending_tasks)
+                    batch.client_tasks.extend(chain)
                     
-                    elif task.execution_target == "client":
-                        # ✅ CLIENT SMART LOGIC:
-                        # If this starts a client chain, include ENTIRE chain!
-                        chain = self._get_client_chain_from_task(state, task, pending_tasks)
-                        batch.client_tasks.extend(chain)
-                        
-                        # Mark all in chain as processed
-                        for chain_task in chain:
-                            processed_task_ids.add(chain_task.task_id)
+                    # Mark all in chain as processed
+                    for chain_task in chain:
+                        processed_ids.add(chain_task.task_id)
+            
+            if batch.client_tasks and len(batch.client_tasks) > 1:
+                logger.info(f"   🔗 Detected client chain: {[t.task_id for t in batch.client_tasks]}")
             
             logger.info(
                 f"📦 Batch for {user_id}: "
@@ -152,15 +156,13 @@ class TaskOrchestrator:
         """
         Get entire client chain starting from a task
         
-        ✅ KEY FEATURE: Returns entire C→C→C chain at once!
+        ✅ KEY OPTIMIZATION: Returns A→B→C all at once!
         
         Example:
         - start_task: create_folder (no deps, runnable)
         - Finds: write_file (depends on create_folder)
         - Finds: copy_file (depends on write_file)
         - Returns: [create_folder, write_file, copy_file]
-        
-        Client handles all three locally! 🚀
         """
         chain = [start_task]
         pending_map = {t.task_id: t for t in all_pending}
@@ -176,35 +178,29 @@ class TaskOrchestrator:
                 
                 # Check if this task:
                 # 1. Is a client task
-                # 2. Depends on current task
-                # 3. All its other deps are either:
-                #    - Server tasks (already completed)
-                #    - Tasks in current chain
+                # 2. Has current task as a dependency
+                # 3. All its dependencies are satisfied
                 if pending_task.execution_target != "client":
                     continue
                 
                 if current_id not in pending_task.depends_on:
                     continue
                 
-                # Check if ALL deps are satisfied
-                can_add_to_chain = True
+                # Verify ALL dependencies are satisfied
+                # (could depend on completed server tasks too)
+                can_add = True
+                completed_ids = state.get_completed_task_ids()
                 chain_ids = {t.task_id for t in chain}
                 
                 for dep_id in pending_task.depends_on:
-                    # Dep must be either:
+                    # Dependency must be either:
                     # - In current chain, OR
-                    # - A completed server task
-                    if dep_id not in chain_ids:
-                        dep_task = state.get_task(dep_id)
-                        if not dep_task or dep_task.status != "completed":
-                            can_add_to_chain = False
-                            break
-                        # If it's completed but client, can't add
-                        if dep_task.execution_target == "client":
-                            can_add_to_chain = False
-                            break
+                    # - Already completed
+                    if dep_id not in chain_ids and dep_id not in completed_ids:
+                        can_add = False
+                        break
                 
-                if can_add_to_chain:
+                if can_add:
                     chain.append(pending_task)
                     current_id = pending_task.task_id
                     found_next = True
@@ -213,21 +209,13 @@ class TaskOrchestrator:
             if not found_next:
                 break
         
-        if len(chain) > 1:
-            logger.info(f"   🔗 Found client chain: {[t.task_id for t in chain]}")
-        
         return chain
     
     def _are_dependencies_met(self, state: ExecutionState, task_id: str) -> bool:
         """
         Check if all dependencies for a task are completed
         
-        Args:
-            state: User execution state
-            task_id: Task to check
-            
-        Returns:
-            True if all dependencies are completed
+        ✅ FIXED: Only checks COMPLETED tasks (not failed)
         """
         task = state.get_task(task_id)
         
@@ -238,6 +226,14 @@ class TaskOrchestrator:
         
         for dep_id in task.depends_on:
             if dep_id not in completed_ids:
+                # Check if dependency exists and is failed
+                dep_task = state.get_task(dep_id)
+                if dep_task and dep_task.status == "failed":
+                    # Dependency failed - this task can never run
+                    logger.warning(
+                        f"⚠️  Task {task_id} depends on failed task {dep_id}, "
+                        f"will never be executable"
+                    )
                 return False
         
         return True
@@ -287,7 +283,11 @@ class TaskOrchestrator:
         task_id: str, 
         error: str
     ) -> None:
-        """Mark task as failed"""
+        """
+        Mark task as failed
+        
+        ✅ IMPORTANT: Also marks dependent tasks as failed to prevent infinite loops
+        """
         async with self._get_lock(user_id):
             state = self.states.get(user_id)
             if not state:
@@ -305,6 +305,35 @@ class TaskOrchestrator:
                 
                 state.updated_at = datetime.now()
                 logger.error(f"❌ [{user_id}] Task {task_id} failed: {error}")
+                
+                # ✅ CASCADE FAILURE: Mark dependent tasks as failed too
+                await self._cascade_failure(user_id, task_id)
+    
+    async def _cascade_failure(self, user_id: str, failed_task_id: str) -> None:
+        """
+        Mark all tasks that depend on a failed task as failed
+        
+        This prevents infinite loops where pending tasks wait for failed dependencies
+        """
+        state = self.states.get(user_id)
+        if not state:
+            return
+        
+        # Find all pending tasks that depend on this one
+        pending_tasks = state.get_tasks_by_status("pending")
+        
+        for task in pending_tasks:
+            if failed_task_id in task.depends_on:
+                task.status = "failed"
+                task.error = f"Dependency '{failed_task_id}' failed"
+                task.completed_at = datetime.now()
+                logger.warning(
+                    f"⚠️  [{user_id}] Task {task.task_id} marked as failed "
+                    f"due to failed dependency: {failed_task_id}"
+                )
+                
+                # Recursively cascade
+                await self._cascade_failure(user_id, task.task_id)
     
     async def mark_task_emitted(self, user_id: str, task_id: str) -> None:
         """Mark client task as emitted to client"""
@@ -327,21 +356,24 @@ class TaskOrchestrator:
         task_id: str, 
         output: TaskOutput
     ) -> None:
-        """Handle acknowledgment from client with results"""
-        async with self._get_lock(user_id):
-            state = self.states.get(user_id)
-            if not state:
-                return
+        """
+        Handle acknowledgment from client with results
+        
+        NOTE: Does NOT acquire lock - called from within locked context
+        """
+        state = self.states.get(user_id)
+        if not state:
+            return
+        
+        task = state.get_task(task_id)
+        if task:
+            task.ack_received_at = datetime.now()
             
-            task = state.get_task(task_id)
-            if task:
-                task.ack_received_at = datetime.now()
-                
-                if output.success:
-                    await self.mark_task_completed(user_id, task_id, output)
-                else:
-                    error = output.error or "Client execution failed"
-                    await self.mark_task_failed(user_id, task_id, error)
+            if output.success:
+                await self.mark_task_completed(user_id, task_id, output)
+            else:
+                error = output.error or "Client execution failed"
+                await self.mark_task_failed(user_id, task_id, error)
     
     def get_state(self, user_id: str) -> Optional[ExecutionState]:
         """Get user execution state"""

@@ -89,7 +89,7 @@ def load_all_tools():
     return instance_registry
 
 
-def get_tool_for_execution(tool_name: str) -> BaseTool:
+def get_tool_for_execution(tool_name: str) -> BaseTool | None:
     """
     Get tool instance for execution
     

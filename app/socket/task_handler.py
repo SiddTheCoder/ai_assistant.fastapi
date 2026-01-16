@@ -1,22 +1,27 @@
 # app/socket/task_handler.py
 """
-WebSocket Task Handler
-Handles task emission to clients and result acknowledgment
+WebSocket Task Handler - Real Production Version
+
+Emits FULL TaskRecord to client for maximum flexibility
+Client gets same data access as server orchestrator
 """
 
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, List
 import socketio
 
 from app.core.orchestrator import get_orchestrator
-from app.core.models import Task, TaskOutput, TaskRecord
+from app.core.models import TaskOutput, TaskRecord
 
 logger = logging.getLogger(__name__)
 
 
 class SocketTaskHandler:
     """
-    Handles task-related WebSocket events
+    Production WebSocket task handler
+    
+    Emits complete TaskRecord to client - client orchestrator 
+    has same level of access as server orchestrator
     """
     
     def __init__(self, sio: socketio.AsyncServer, connected_users: Dict[str, set]):
@@ -26,14 +31,10 @@ class SocketTaskHandler:
     
     async def emit_task_single(self, user_id: str, task: TaskRecord) -> bool:
         """
-        Emit a task to the client for execution
+        Emit single task to client
         
-        Args:
-            user_id: User identifier
-            task: TaskRecord to execute on client
-            
-        Returns:
-            True if emitted successfully
+        ✅ Sends COMPLETE TaskRecord as JSON
+        Client deserializes into its own TaskRecord model
         """
         # Check if user is connected
         if user_id not in self.connected_users or not self.connected_users[user_id]:
@@ -43,30 +44,11 @@ class SocketTaskHandler:
         # Get one of the user's socket IDs
         sid = next(iter(self.connected_users[user_id]))
         
-        # ✅ Prepare FULL task payload - client gets EVERYTHING
-        payload = {
-            # Complete task definition
-            "task_id": task.task_id,
-            "tool": task.tool,
-            "execution_target": task.execution_target,
-            "depends_on": task.depends_on,
-            
-            # Inputs (both static and resolved)
-            "inputs": task.task.inputs,  # Original static inputs
-            "resolved_inputs": task.resolved_inputs,  # After binding resolution
-            "input_bindings": task.task.input_bindings,  # For client-side resolution if needed
-            
-            # ✅ Lifecycle messages - client can show these to user!
-            "lifecycle_messages": task.lifecycle_messages.dict() if task.lifecycle_messages else None,
-            
-            # ✅ Control settings - client respects these!
-            "control": task.control.dict() if task.control else None,
-            
-            # Metadata
-            "created_at": task.created_at.isoformat()
-        }
-        
         try:
+            # ✅ Send ENTIRE TaskRecord as JSON
+            # Client gets same data as server orchestrator!
+            payload = task.model_dump(mode='json')
+            
             # Emit to client
             await self.sio.emit(
                 "task:execute",
@@ -84,21 +66,44 @@ class SocketTaskHandler:
             logger.error(f"❌ Failed to emit task {task.task_id}: {e}")
             return False
     
-    async def emit_batch_to_client(self, user_id: str, tasks: list[TaskRecord]) -> int:
+    async def emit_task_batch(self, user_id: str, tasks: List[TaskRecord]) -> bool:
         """
-        Emit multiple tasks to client
+        Emit batch of tasks to client (for chains)
         
-        Returns:
-            Number of successfully emitted tasks
+        ✅ Client receives entire chain and handles dependencies locally
+        This is MUCH faster than individual emissions!
         """
-        success_count = 0
+        # Check if user is connected
+        if user_id not in self.connected_users or not self.connected_users[user_id]:
+            logger.warning(f"⚠️  User {user_id} not connected - cannot emit batch")
+            return False
         
-        for task in tasks:
-            if await self.emit_task_single(user_id, task):
-                success_count += 1
+        sid = next(iter(self.connected_users[user_id]))
         
-        logger.info(f"📤 Emitted {success_count}/{len(tasks)} tasks to {user_id}")
-        return success_count
+        try:
+            # ✅ Send array of complete TaskRecords
+            payload = {
+                "tasks": [task.model_dump(mode='json') for task in tasks],
+                "is_chain": True  # Signal to client this is a dependency chain
+            }
+            
+            # Emit to client
+            await self.sio.emit(
+                "task:execute_batch",
+                payload,
+                room=sid
+            )
+            
+            # Mark all as emitted
+            for task in tasks:
+                await self.orchestrator.mark_task_emitted(user_id, task.task_id)
+            
+            logger.info(f"📦 Emitted batch of {len(tasks)} tasks to client {user_id}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to emit batch: {e}")
+            return False
     
     async def handle_task_result(
         self, 
@@ -107,12 +112,9 @@ class SocketTaskHandler:
         result: Dict[str, Any]
     ) -> None:
         """
-        Handle task result from client
+        Handle task result acknowledgment from client
         
-        Args:
-            user_id: User identifier
-            task_id: Task that completed
-            result: Result data from client
+        Client sends back TaskOutput after execution
         """
         try:
             # Parse result into TaskOutput
@@ -122,13 +124,10 @@ class SocketTaskHandler:
                 error=result.get("error")
             )
             
-            # Update orchestrator
+            # Update orchestrator (no lock needed - called from socket handler)
             await self.orchestrator.handle_client_ack(user_id, task_id, output)
             
             logger.info(f"✅ Received result for task {task_id} from {user_id}")
-            
-            # Notify user via socket
-            await self.notify_task_status(user_id, task_id, "completed" if output.success else "failed")
             
         except Exception as e:
             logger.error(f"❌ Failed to handle task result: {e}")
@@ -145,12 +144,8 @@ class SocketTaskHandler:
         status: str
     ) -> None:
         """
-        Notify user about task status change
-        
-        Args:
-            user_id: User identifier
-            task_id: Task ID
-            status: New status
+        Notify client about task status change
+        (Optional - for real-time UI updates)
         """
         if user_id not in self.connected_users:
             return
@@ -170,52 +165,37 @@ class SocketTaskHandler:
                 )
             except Exception as e:
                 logger.error(f"Failed to notify status: {e}")
-    
-    async def get_task_status(self, user_id: str, task_id: str) -> Dict[str, Any]:
-        """
-        Get current task status
-        
-        Returns:
-            Task status information
-        """
-        task = self.orchestrator.get_task(user_id, task_id)
-        
-        if not task:
-            return {
-                "found": False,
-                "error": "Task not found"
-            }
-        
-        return {
-            "found": True,
-            "task_id": task.task_id,
-            "tool": task.tool,
-            "status": task.status,
-            "execution_target": task.execution_target,
-            "started_at": task.started_at.isoformat() if task.started_at else None,
-            "completed_at": task.completed_at.isoformat() if task.completed_at else None,
-            "duration_ms": task.duration_ms,
-            "error": task.error
-        }
 
 
-# Example Socket.IO event handlers
+# Socket.IO event registration
 async def register_task_events(
     sio: socketio.AsyncServer, 
     connected_users: Dict[str, set]
-):
+) -> SocketTaskHandler:
     """
-    Register task-related socket events
-    Call this in your socket_server.py
+    Register task-related WebSocket events
+    
+    Returns handler for injection into execution engine
     """
     handler = SocketTaskHandler(sio, connected_users)
     
-    @sio.on("task:result") # type: ignore
+    @sio.on("task:result") #type: ignore
     async def handle_task_result(sid: str, data: Dict[str, Any]):
-        """Client sends task execution result"""
+        """
+        Client sends task execution result
+        
+        Expected data:
+        {
+            "user_id": "user_123",
+            "task_id": "task_abc",
+            "result": {
+                "success": true,
+                "data": {...},
+                "error": null
+            }
+        }
+        """
         try:
-            # Get user_id from session (you need to implement this)
-            # For now, assuming data contains user_id
             user_id = data.get("user_id")
             task_id = data.get("task_id")
             result = data.get("result", {})
@@ -229,33 +209,43 @@ async def register_task_events(
         except Exception as e:
             logger.error(f"Error handling task result: {e}")
     
-    @sio.on("task:status_request") # type: ignore
-    async def handle_status_request(sid: str, data: Dict[str, Any]):
-        """Client requests task status"""
+    @sio.on("task:batch_results") #type: ignore
+    async def handle_batch_results(sid: str, data: Dict[str, Any]):
+        """
+        Client sends results for entire batch
+        
+        Expected data:
+        {
+            "user_id": "user_123",
+            "results": [
+                {"task_id": "task_1", "result": {...}},
+                {"task_id": "task_2", "result": {...}}
+            ]
+        }
+        """
         try:
             user_id = data.get("user_id")
-            task_id = data.get("task_id")
+            results = data.get("results", [])
             
-            if not user_id or not task_id:
-                return {"error": "Missing user_id or task_id"}
+            for item in results:
+                task_id = item.get("task_id")
+                result = item.get("result", {})
+                
+                if task_id:
+                    await handler.handle_task_result(user_id, task_id, result) #type: ignore
             
-            status = await handler.get_task_status(user_id, task_id)
-            
-            await sio.emit("task:status_response", status, room=sid)
+            logger.info(f"✅ Processed {len(results)} batch results from {user_id}")
             
         except Exception as e:
-            logger.error(f"Error handling status request: {e}")
+            logger.error(f"Error handling batch results: {e}")
     
     logger.info("✅ Task event handlers registered")
-    
-    # Return handler for dependency injection into execution engine
     return handler
 
 
-# Export for use in other modules
 def get_task_handler(
     sio: socketio.AsyncServer, 
     connected_users: Dict[str, set]
 ) -> SocketTaskHandler:
-    """Get or create task handler"""
+    """Factory function to create task handler"""
     return SocketTaskHandler(sio, connected_users)

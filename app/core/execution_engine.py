@@ -17,6 +17,7 @@ from datetime import datetime
 
 from app.core.orchestrator import get_orchestrator
 from app.core.models import TaskRecord, TaskOutput
+from app.core.binding_resolver import get_binding_resolver
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,7 @@ class ExecutionEngine:
     
     def __init__(self):
         self.orchestrator = get_orchestrator()
+        self.binding_resolver = get_binding_resolver()
         
         # Track running engines per user
         self.running_engines: Dict[str, asyncio.Task] = {}
@@ -135,7 +137,7 @@ class ExecutionEngine:
                     logger.info(f"\n🚀 Executing {len(batch.server_tasks)} server tasks in parallel...")
                     await self._execute_server_batch(user_id, batch.server_tasks)
                 
-                # 3. Emit client tasks
+                # 3. Emit client tasks (with smart batching)
                 if batch.client_tasks:
                     logger.info(f"\n📤 Emitting {len(batch.client_tasks)} client tasks...")
                     await self._emit_client_batch(user_id, batch.client_tasks)
@@ -198,6 +200,22 @@ class ExecutionEngine:
             if not self.server_tool_executor: 
                 raise RuntimeError("Server tool executor not configured")    
             
+            # ✅ RESOLVE INPUT BINDINGS BEFORE EXECUTION
+            state = self.orchestrator.get_state(user_id)
+            if not state:
+                raise RuntimeError(f"No execution state for user: {user_id}")
+            
+            # Validate bindings can be resolved
+            can_resolve, error = self.binding_resolver.validate_bindings(task, state)
+            if not can_resolve:
+                raise ValueError(f"Cannot resolve bindings: {error}")
+            
+            # Resolve inputs (static + bindings)
+            resolved_inputs = self.binding_resolver.resolve_inputs(task, state)
+            task.resolved_inputs = resolved_inputs
+            
+            logger.info(f"     📋 Resolved inputs: {list(resolved_inputs.keys())}")
+            
             # Get timeout
             timeout = None
             if task.control and task.control.timeout_ms:
@@ -215,7 +233,6 @@ class ExecutionEngine:
             
             # Mark completed
             await self.orchestrator.mark_task_completed(user_id, task.task_id, output)
-            #TODO : I need to implement the input bindings here i guess or might be in the orchestrator after any task get completedt
             
             # Show success message
             if task.lifecycle_messages and task.lifecycle_messages.on_success:
@@ -239,17 +256,14 @@ class ExecutionEngine:
     
     async def _emit_client_batch(self, user_id: str, tasks: list[TaskRecord]) -> None:
         """
-        Emit client tasks in batches
+        Emit client tasks - orchestrator already detected chains!
         
-        SMART BATCHING:
-        - If tasks are independent → Emit separately (parallel on client)
-        - If tasks are chained (A→B→C all client) → Emit as batch (client handles locally)
-        
-        This makes client execution snappy!
+        If orchestrator returned A→B→C, emit them together.
+        Otherwise emit individually for parallel execution.
         """
         if not self.client_task_emitter:
             logger.error("❌ No client task emitter configured!")
-            # MARK TASKS AS FAILED!
+            # MARK TASKS AS FAILED! (cascades to dependents automatically)
             for task in tasks:
                 await self.orchestrator.mark_task_failed(
                     user_id,
@@ -258,21 +272,40 @@ class ExecutionEngine:
                 )
             return 
         
-        # Group tasks by dependency chains
-        independent_tasks = []
-        chained_batches = self._group_chained_tasks(tasks)
+        # Get state for binding resolution
+        state = self.orchestrator.get_state(user_id)
         
-        # Emit chained batches (client handles dependencies locally)
-        for chain in chained_batches:
-            if len(chain) > 1:
-                logger.info(f"  📦 Emitting chained batch: {[t.task_id for t in chain]}")
-                await self.client_task_emitter.emit_task_batch(user_id, chain)
-            else:
-                independent_tasks.extend(chain)
+        # Check if tasks form a chain (orchestrator already did the work!)
+        is_chain = len(tasks) > 1 and self._is_dependency_chain(tasks)
         
-        # Emit independent tasks separately
-        for task in independent_tasks:
-            try:
+        if is_chain:
+            # Emit entire chain as batch
+            logger.info(f"  📦 Emitting chained batch: {[t.task_id for t in tasks]}")
+            
+            # Resolve bindings for entire chain
+            if state:
+                for task in tasks:
+                    try:
+                        can_resolve, error = self.binding_resolver.validate_bindings(task, state)
+                        if can_resolve:
+                            resolved_inputs = self.binding_resolver.resolve_inputs(task, state)
+                            task.resolved_inputs = resolved_inputs
+                    except Exception as e:
+                        logger.warning(f"     ⚠️  Could not resolve bindings for {task.task_id}: {e}")
+            
+            await self.client_task_emitter.emit_task_batch(user_id, tasks)
+        else:
+            # Emit tasks separately for parallel execution
+            for task in tasks:
+             try:
+                # ✅ RESOLVE INPUT BINDINGS BEFORE EMITTING
+                if state:
+                    can_resolve, error = self.binding_resolver.validate_bindings(task, state)
+                    if can_resolve:
+                        resolved_inputs = self.binding_resolver.resolve_inputs(task, state)
+                        task.resolved_inputs = resolved_inputs
+                        logger.info(f"     📋 Resolved inputs for {task.task_id}")
+                
                 if task.lifecycle_messages and task.lifecycle_messages.on_start:
                     logger.info(f"     💬 {task.lifecycle_messages.on_start}")
                 
@@ -283,56 +316,28 @@ class ExecutionEngine:
                 else:
                     logger.warning(f"  ⚠️  Failed to emit: {task.task_id}")
             
-            except Exception as e:
+             except Exception as e:
                 logger.error(f"  ❌ Error emitting {task.task_id}: {e}")
     
-    def _group_chained_tasks(self, tasks: list[TaskRecord]) -> list[list[TaskRecord]]:
+    def _is_dependency_chain(self, tasks: list[TaskRecord]) -> bool:
         """
-        Group tasks by dependency chains
+        Check if tasks form a dependency chain
         
-        Example:
-        - task1 (no deps)
-        - task2 (depends on task1)
-        - task3 (depends on task2)
-        
-        Returns: [[task1, task2, task3]]
-        
-        This allows client to handle entire chain locally!
+        Returns True if tasks are: A → B → C (sequential dependencies)
+        Returns False if they're independent: A, B, C (parallel)
         """
-        if not tasks:
-            return []
+        if len(tasks) <= 1:
+            return False
         
-        chains = []
-        task_map = {t.task_id: t for t in tasks}
-        processed = set()
+        # Check if each task (except first) depends on previous
+        for i in range(1, len(tasks)):
+            prev_id = tasks[i-1].task_id
+            curr_deps = tasks[i].depends_on
+            
+            if prev_id not in curr_deps:
+                return False  # Not a chain
         
-        for task in tasks:
-            if task.task_id in processed:
-                continue
-            
-            # Build chain starting from this task
-            chain = [task]
-            processed.add(task.task_id)
-            
-            # Look for tasks that depend on this one
-            current_id = task.task_id
-            while True:
-                found_dependent = False
-                for other_task in tasks:
-                    if other_task.task_id not in processed:
-                        if current_id in other_task.depends_on:
-                            chain.append(other_task)
-                            processed.add(other_task.task_id)
-                            current_id = other_task.task_id
-                            found_dependent = True
-                            break
-                
-                if not found_dependent:
-                    break
-            
-            chains.append(chain)
-        
-        return chains
+        return True
     
     async def _print_final_summary(self, user_id: str):
         """Print execution summary at the end"""
