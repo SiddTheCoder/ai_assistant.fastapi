@@ -22,13 +22,16 @@ Matches tool_registry.json:
 
 
 import asyncio
-from typing import Dict, Any
+from typing import Dict, Any, List
 from datetime import datetime
 
 from app.tools.base import BaseTool, ToolOutput
 
 # web searcher duckduckgo
-from ddgs import DDGS
+try:
+    from duckduckgo_search import DDGS
+except ImportError:
+    DDGS = None
 import re
 
 BLOCKED_DOMAINS = (
@@ -88,6 +91,7 @@ class WebSearchTool(BaseTool):
         # Run search
         init_time = datetime.now()
         results = await self._fetch_web_results(query, max_results)
+        # results = self._mock_search(query, max_results)
         search_time_ms = (datetime.now() - init_time).total_seconds() * 1000    
         return ToolOutput(
             success=True,

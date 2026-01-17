@@ -164,7 +164,10 @@ tool_registry = ToolRegistry()
 
 
 def get_tool_registry() -> ToolRegistry:
-    """Get the global tool registry instance"""
+    """Get the global tool registry instance - schemas"""
+    # Auto-load if not loaded
+    if not tool_registry.tools:
+        tool_registry.load()
     return tool_registry
 
 

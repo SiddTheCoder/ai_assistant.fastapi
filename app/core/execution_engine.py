@@ -100,6 +100,8 @@ class ExecutionEngine:
                 
                 # 1. Get executable batch
                 batch = await self.orchestrator.get_executable_batch(user_id)
+
+                logger.info(f"🔍 Found {len(batch.server_tasks)} server tasks, {len(batch.client_tasks)} client tasks")
                 
                 has_work = bool(batch.server_tasks or batch.client_tasks)
                 
@@ -149,7 +151,8 @@ class ExecutionEngine:
                 logger.warning(f"⚠️  Max iterations reached for {user_id}")
         
         except Exception as e:
-            logger.error(f"❌ Execution loop error for {user_id}: {e}")
+            print(f"DEBUG: Execution loop error for {user_id}: {e}")
+            logger.error(f"❌ Execution loop error for {user_id}: {e}", exc_info=True)
         
         finally:
             # Cleanup

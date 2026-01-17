@@ -15,6 +15,8 @@ from datetime import datetime
 import sys
 import os
 
+from app.core.models import TaskRecord
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -181,34 +183,34 @@ async def scenario_system_tools():
     target_app = "notepad"
     
     tasks = [
-        # {
-        #     "task": {
-        #         "task_id": "open_app_1",
-        #         "tool": "open_app",
-        #         "execution_target": "client",
-        #         "depends_on": [],
-        #         "inputs": {"target": target_app},
-        #         "lifecycle_messages": {
-        #             "on_start": f"Opening {target_app}...",
-        #             "on_success": f"{target_app} opened"
-        #         }
-        #     },
-        #     "status": "pending"
-        # },
-        # {
-        #     "task": {
-        #         "task_id": "wait_and_close",
-        #         "tool": "close_app",
-        #         "execution_target": "client",
-        #         "depends_on": ["open_app_1"],
-        #         "inputs": {"target": "notepad"},
-        #         "lifecycle_messages": {
-        #             "on_start": "Closing Notepad...",
-        #             "on_success": "Notepad closed"
-        #         }
-        #     },
-        #     "status": "pending"
-        # },
+        {
+            "task": {
+                "task_id": "open_app_1",
+                "tool": "open_app",
+                "execution_target": "client",
+                "depends_on": [],
+                "inputs": {"target": target_app},
+                "lifecycle_messages": {
+                    "on_start": f"Opening {target_app}...",
+                    "on_success": f"{target_app} opened"
+                }
+            },
+            "status": "emitted"
+        },
+        {
+            "task": {
+                "task_id": "opem",
+                "tool": "open_app",
+                "execution_target": "client",
+                "depends_on": ["open_app_1"],
+                "inputs": {"target": "camera"},
+                "lifecycle_messages": {
+                    "on_start": "Closing Notepad...",
+                    "on_success": "Notepad closed"
+                }
+            },
+            "status": "emitted"
+        },
         {
             "task": {
                 "task_id": "openapp_1",
@@ -221,13 +223,19 @@ async def scenario_system_tools():
                     "on_success": "Camera opened"
                 }
             },
-            "status": "pending"
+            "status": "emitted"
         }
     ]
+
+
     
     logger.info("📨 Sending system tasks...")
-    await receive_tasks_from_server(user_id, tasks)
-    await engine.wait_for_completion()
+    # await receive_tasks_from_server(user_id, tasks)
+    # await engine.wait_for_completion()
+    from app.core.task_emitter import get_task_emitter
+    emitter = get_task_emitter()
+    tasks = [TaskRecord(**task) for task in tasks]
+    await emitter.emit_task_batch("user_id", tasks)
     logger.info("✅ Scenario 3 Complete")
 
 
@@ -254,8 +262,8 @@ async def scenario_simulated_workflow():
                 "execution_target": "client",
                 "depends_on": [],
                 "inputs": {
-                    "target": "explorer", 
-                    "args": ["/ai-server/models"]
+                    # "target": "explorer", 
+                    # "args": ["~/test_client_core"]
                 },
                 "lifecycle_messages": {
                     "on_start": "Opening Project Folder...",
@@ -264,23 +272,23 @@ async def scenario_simulated_workflow():
             },
             "status": "pending"
         },
-        # {
-        #     "task": {
-        #         "task_id": "create_readme",
-        #         "tool": "file_create",
-        #         "execution_target": "client",
-        #         "depends_on": ["open_project_folder"],
-        #         "inputs": {
-        #             "path": "~/test_client_core/README.md",
-        #             "content": "# Project Alpha\nManaged by AI Assistant"
-        #         },
-        #         "lifecycle_messages": {
-        #             "on_start": "Creating README...",
-        #             "on_success": "README created"
-        #         }
-        #     },
-        #     "status": "pending"
-        # },
+        {
+            "task": {
+                "task_id": "create_readme",
+                "tool": "file_create",
+                "execution_target": "client",
+                "depends_on": ["open_project_folder"],
+                "inputs": {
+                    "path": "~/test_client_core/README.md",
+                    "content": "# Project Alpha\nManaged by AI Assistant"
+                },
+                "lifecycle_messages": {
+                    "on_start": "Creating README...",
+                    "on_success": "README created"
+                }
+            },
+            "status": "pending"
+        },
         
         # Chain B: Editor Interaction ("Open Notepad then Write")
         # {
@@ -326,12 +334,17 @@ async def run_tests():
     try:
         # await scenario_chain_handling()
         # await scenario_parallel_execution()
-        # await scenario_system_tools()
-        await scenario_simulated_workflow()
+        await scenario_system_tools()
+        # await scenario_simulated_workflow()
         print_section("🎉 ALL CLIENT TESTS PASSED")
     except Exception as e:
         logger.error(f"❌ Test Failed: {e}")
         # raise e
 
+def check():
+    from app.client_core.main import run_demo_tasks
+    asyncio.run(run_demo_tasks())
+
 if __name__ == "__main__":
     asyncio.run(run_tests())
+    # check()

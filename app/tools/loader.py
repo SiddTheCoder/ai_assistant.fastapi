@@ -35,12 +35,15 @@ def load_all_tools():
     
     Called ONCE in main.py during server startup
     """
+    # Auto-load check
+    instance_registry = get_tool_instance_registry()
+    if instance_registry.count() > 0:
+        return instance_registry
+
     logger.info("="*70)
     logger.info("🔧 Loading Tool Instances")
     logger.info("="*70)
     
-    # Get registries
-    instance_registry = get_tool_instance_registry()
     schema_registry = get_tool_registry()
     
     # Create all tool instances
@@ -100,5 +103,9 @@ def get_tool_for_execution(tool_name: str) -> BaseTool | None:
     - ServerToolExecutor
     - ClientToolExecutor (in Electron app)
     """
+    # Auto-load if needed
+    if get_tool_instance_registry().count() == 0:
+        load_all_tools()
+
     from app.tools.base import get_tool_instance
     return get_tool_instance(tool_name)

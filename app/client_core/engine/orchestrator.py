@@ -6,7 +6,7 @@ Manages client-side task execution state.
 """
 
 import logging
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Set
 from datetime import datetime
 
 from ..models import (
@@ -25,10 +25,13 @@ class ClientOrchestrator:
     - Store received tasks from server
     - Track execution state
     - Provide task outputs for binding resolution
+    - Track server-completed dependencies
     """
     
     def __init__(self, user_id: str):
         self.state = ExecutionState(user_id=user_id)
+        # Track dependencies completed on server (not visible to client)
+        self.server_completed_dependencies: Set[str] = set()
         logger.info(f"✅ Client Orchestrator initialized for {user_id}")
     
     def register_task(self, task_record_data: Dict[str, Any]) -> TaskRecord:
@@ -41,7 +44,14 @@ class ClientOrchestrator:
         Returns:
             TaskRecord
         """
+        # Extract server-completed dependencies metadata
+        server_completed = task_record_data.pop('server_completed_dependencies', [])
+        if server_completed:
+            self.server_completed_dependencies.update(server_completed)
+            logger.info(f"   📊 Marking {len(server_completed)} dependencies as server-completed: {server_completed}")
+        
         record = TaskRecord.model_validate(task_record_data)
+        record.status = "pending"
         self.state.add_task(record)
         logger.info(f"📥 Registered task: {record.task_id} ({record.tool})")
         return record
@@ -103,6 +113,9 @@ class ClientOrchestrator:
         Get tasks ready to execute.
         
         Returns tasks whose dependencies are completed.
+        Now considers both:
+        - Client-side completed tasks
+        - Server-side completed tasks (tracked separately)
         """
         executable = []
         pending_tasks = [
@@ -110,11 +123,20 @@ class ClientOrchestrator:
             if task.status == "pending"
         ]
         
+        # Combine client-completed + server-completed dependencies
         completed_ids = self.state.get_completed_task_ids()
+        all_completed = set(completed_ids).union(self.server_completed_dependencies)
         
         for task in pending_tasks:
-            if all(dep_id in completed_ids for dep_id in task.depends_on):
+            # Check if all dependencies are satisfied
+            # (either completed on client OR completed on server)
+            if all(dep_id in all_completed for dep_id in task.depends_on):
                 executable.append(task)
+                if task.depends_on:
+                    # Log which deps were server vs client
+                    server_deps = [d for d in task.depends_on if d in self.server_completed_dependencies]
+                    client_deps = [d for d in task.depends_on if d in completed_ids]
+                    logger.info(f"   ✅ Task {task.task_id} ready (server deps: {server_deps}, client deps: {client_deps})")
         
         return executable
     

@@ -1,4 +1,5 @@
 from app.utils import  clean_pqh_response
+from app.models.pqh_response_model import CognitiveState, PQHResponse
 from app.cache.load_user import load_user 
 from app.ai.providers.manager import ProviderManager
 from typing import Optional
@@ -9,6 +10,7 @@ from app.prompts import pqh_prompt
 from app.registry.tool_index import get_tools_index
 import json
 from app.controllers.chat_controllers import ChatController,add_chat_message_to_mongo
+from app.services.sqh_service import process_sqh
 import asyncio
 import logging
 
@@ -18,7 +20,7 @@ async def chat(
     query: str,
     user_id: str = "guest",
     model_name: Optional[str] = None
-) -> clean_pqh_response.PQHResponse:
+) -> PQHResponse:
     """
     Main entry point for the chat service as PQH - Primary Query Handler.
     Args:
@@ -91,7 +93,7 @@ async def chat(
         
         # --- Step 6: Clean and Return Response ---
         cleaned_response = clean_pqh_response.clean_pqh_response(raw_response, emotion)
-        print("cleaned response before ",cleaned_response)
+
         
         # Add ai response to Redis asynchronously
         asyncio.create_task(
@@ -111,6 +113,12 @@ async def chat(
             )
         ))
 
+        # --- Step 7: Trigger SQH in Background (if tools needed) ---
+        if cleaned_response.requested_tool and len(cleaned_response.requested_tool) > 0:
+            logger.info("🔧 Tools requested by PQH. Triggering SQH in background...")
+            asyncio.create_task(
+                process_sqh(cleaned_response, user_details)
+            )
         
         return cleaned_response
     
@@ -121,12 +129,12 @@ async def chat(
 
     
 
-def _create_error_response(message: str, emotion: str, query: str = ""):
+def _create_error_response(message: str, emotion: str, query: str = "") -> PQHResponse:
     """Helper to create fallback error responses with all required fields."""
    
-    return clean_pqh_response.PQHResponse(
+    return PQHResponse(
        request_id="error_response",
-       cognitive_state=clean_pqh_response.CognitiveState(
+       cognitive_state=CognitiveState(
               userQuery=query,
               emotion=emotion,
               thought_process="Error occurred while processing the request.",

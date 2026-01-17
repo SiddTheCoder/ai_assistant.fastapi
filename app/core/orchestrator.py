@@ -344,7 +344,7 @@ class TaskOrchestrator:
             
             task = state.get_task(task_id)
             if task:
-                task.status = "running"
+                task.status = "emitted"
                 task.emitted_at = datetime.now()
                 task.started_at = datetime.now()
                 state.updated_at = datetime.now()
@@ -404,7 +404,9 @@ class TaskOrchestrator:
                 "running": 0,
                 "completed": 0,
                 "failed": 0,
-                "waiting": 0
+                "waiting": 0,
+                "skipped": 0,
+                "emitted": 0
             }
             
             for task in state.tasks.values():

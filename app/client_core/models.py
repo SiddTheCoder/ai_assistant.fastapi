@@ -12,7 +12,7 @@ from datetime import datetime
 
 ExecutionTarget = Literal["client", "server"]
 FailurePolicy = Literal["abort", "continue", "retry"]
-TaskStatus = Literal["pending", "running", "completed", "failed", "waiting"]
+TaskStatus = Literal["pending", "running", "completed", "failed", "waiting", "emitted"]
 
 
 class LifecycleMessages(BaseModel):

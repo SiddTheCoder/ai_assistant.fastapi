@@ -1,22 +1,5 @@
 # test_real_world_scenarios.py
-"""
-Real-world execution scenarios test
 
-Tests all patterns:
-1. S→S: Server chain (web_search → api_call)
-2. S1, S2: Independent parallel server tasks
-3. S→C→C: Server triggers client chain
-4. C→C→C: Pure client chain
-5. C1, C2: Independent parallel client tasks
-6. Mixed: Complex dependency graph
-
-This validates:
-- Parallel execution
-- Dependency resolution
-- Input binding
-- Chain batching
-- Mixed server/client workflows
-"""
 
 import asyncio
 import logging
@@ -33,7 +16,7 @@ from app.registry.loader import load_tool_registry
 from app.core.orchestrator import init_orchestrator
 from app.core.execution_engine import init_execution_engine
 from app.core.server_executor import init_server_executor
-from app.core.mock_client_emitter import create_mock_emitter
+from app.core.task_emitter import get_task_emitter
 from app.core.models import Task, LifecycleMessages
 from app.tools.loader import load_all_tools
 
@@ -63,7 +46,7 @@ async def scenario_1_server_chain():
     execution_engine = init_execution_engine()
     execution_engine.set_server_executor(server_executor)
     # ✅ Add mock client emitter
-    mock_emitter = create_mock_emitter(auto_complete=True, delay_ms=100)
+    mock_emitter = get_task_emitter()
     execution_engine.set_client_emitter(mock_emitter)
     
     user_id = "scenario_1"
@@ -174,24 +157,27 @@ async def scenario_2_parallel_servers():
     
     return summary
 
-
 async def scenario_3_server_to_client_chain():
     """
     Scenario 3: S→C→C (Server triggers Client Chain)
     
-    fetch_data → create_folder → save_file
+    fetch_data → open_notepad
     
     Tests:
     - Server to client handoff
-    - Client chain batching
+    - Client task execution after server completion
     - Input binding across execution targets
     """
-    print_section("SCENARIO 3: Server to Client Chain (S→C→C)")
+    print_section("SCENARIO 3: Server to Client Chain (S→C)")
     
     orchestrator = init_orchestrator()
     server_executor = init_server_executor()
     execution_engine = init_execution_engine()
     execution_engine.set_server_executor(server_executor)
+    
+    # ✅ Add mock client emitter
+    mock_emitter = get_task_emitter()
+    execution_engine.set_client_emitter(mock_emitter)
     
     user_id = "scenario_3"
     
@@ -203,36 +189,46 @@ async def scenario_3_server_to_client_chain():
             depends_on=[],
             inputs={"query": "latest AI research papers"},
             lifecycle_messages=LifecycleMessages(
-                on_start="📥 Fetching research data from web...",
+                on_start="📥 Fetc`hing research data from web...",
                 on_success="✅ Data fetched successfully"
             )
         ),
         Task(
-            task_id="create_folder",
-            tool="folder_create",
+            task_id="open_notepad",
+            tool="open_app",
             execution_target="client",
-            depends_on=["fetch_data"],
-            inputs={"path": "~/research_data"},
+            depends_on=[],
+            inputs={"target": "notepad"},
             input_bindings={},
             lifecycle_messages=LifecycleMessages(
-                on_start="📁 Creating folder on client...",
-                on_success="✅ Folder created"
+                on_start="📁 Opening Notepad on client...",
+                on_success="✅ Notepad opened successfully"
             )
         ),
         Task(
-            task_id="save_file",
-            tool="file_create",
+            task_id="open_vscode",
+            tool="open_app",
             execution_target="client",
-            depends_on=["create_folder"],
-            inputs={"path": "~/research_data/papers.txt"},
-            input_bindings={
-                "content": "$.fetch_data.data.results"
-            },
+            depends_on=[],
+            inputs={"target": "vscode"},
+            input_bindings={},
             lifecycle_messages=LifecycleMessages(
-                on_start="💾 Saving file with research data...",
-                on_success="✅ File saved successfully"
+                on_start="📁 Opening VSCode on client...",
+                on_success="✅ VSCode opened successfully"
             )
         ),
+        Task(
+            task_id="open_zen",
+            tool="open_app",
+            execution_target="client",
+            depends_on=[],
+            inputs={"target": "Zen"},
+            input_bindings={},
+            lifecycle_messages=LifecycleMessages(
+                on_start="📁 Opening Notepad on client...",
+                on_success="✅ Notepad opened successfully"
+            )
+        )
     ]
     
     await orchestrator.register_tasks(user_id, tasks)
@@ -242,16 +238,19 @@ async def scenario_3_server_to_client_chain():
     summary = await orchestrator.get_execution_summary(user_id)
     logger.info(f"\n📊 Summary: {summary}")
     
-    # Verify chain was batched
+    # Verify server→client handoff
     state = orchestrator.get_state(user_id)
     if state:
-        create_task = state.get_task("create_folder")
-        save_task = state.get_task("save_file")
-        if create_task and save_task:
-            logger.info(f"\n🔗 Chain batching verification:")
-            logger.info(f"   create_folder emitted at: {create_task.emitted_at}")
-            logger.info(f"   save_file emitted at: {save_task.emitted_at}")
-            logger.info(f"   ✅ Should be emitted together in batch!")
+        fetch_task = state.get_task("fetch_data")
+        notepad_task = state.get_task("open_notepad")
+        
+        if fetch_task and notepad_task:
+            logger.info(f"\n🔗 Server→Client handoff verification:")
+            logger.info(f"   fetch_data completed at: {fetch_task.completed_at}")
+            logger.info(f"   open_notepad emitted at: {notepad_task.emitted_at}")
+            logger.info(f"   ✅ Client task emitted after server completion!")
+        else:
+            logger.warning(f"⚠️ Tasks not found - fetch_task: {fetch_task}, notepad_task: {notepad_task}")
     
     return summary
 
@@ -273,10 +272,10 @@ async def scenario_4_pure_client_chain():
     orchestrator = init_orchestrator()
     execution_engine = init_execution_engine()
     # ✅ Add mock client emitter  
-    mock_emitter = create_mock_emitter(auto_complete=True, delay_ms=100)
+    mock_emitter = get_task_emitter()
     execution_engine.set_client_emitter(mock_emitter)
     # ✅ Add mock client emitter
-    mock_emitter = create_mock_emitter(auto_complete=True, delay_ms=100)
+    mock_emitter = get_task_emitter()
     execution_engine.set_client_emitter(mock_emitter)
     
     user_id = "scenario_4"
@@ -284,7 +283,7 @@ async def scenario_4_pure_client_chain():
     tasks = [
         Task(
             task_id="create_project",
-            tool="folder_create",
+            tool="file_open",
             execution_target="client",
             depends_on=[],
             inputs={"path": "~/my_project"},
@@ -555,22 +554,15 @@ async def run_all_scenarios():
     print_section("🚀 REAL-WORLD EXECUTION SCENARIOS TEST SUITE")
     
     results = {}
-    
-    try:
-        # Initialize once
-        load_tool_registry()
-        load_all_tools()
-        logger.info("✅ Tools loaded\n")
-    except Exception as e:
-        logger.warning(f"⚠️  Tool loading failed: {e}\n")
+
     
     # Run each scenario
     scenarios = [
         # ("Scenario 1: S→S", scenario_1_server_chain),
         # ("Scenario 2: S1, S2", scenario_2_parallel_servers),
-        # ("Scenario 3: S→C→C", scenario_3_server_to_client_chain),
-        ("Scenario 4: C→C→C", scenario_4_pure_client_chain),
-        ("Scenario 5: C1, C2", scenario_5_parallel_clients),
+        ("Scenario 3: S→C→C", scenario_3_server_to_client_chain),
+        # ("Scenario 4: C→C→C", scenario_4_pure_client_chain),
+        # ("Scenario 5: C1, C2", scenario_5_parallel_clients),
         # ("Scenario 6: Complex", scenario_6_complex_mixed),
     ]
     

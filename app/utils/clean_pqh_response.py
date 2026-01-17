@@ -5,21 +5,11 @@ import logging
 from typing import Optional
 from pydantic import BaseModel, ValidationError
 from json_repair import repair_json
+from app.models.pqh_response_model import PQHResponse, CognitiveState
 
 logger = logging.getLogger(__name__)
 
-# ==================== SCHEMAS ====================
-class CognitiveState(BaseModel):
-    userQuery: str
-    emotion: str
-    thought_process: str
-    answer: str
-    answerEnglish: str
- 
-class PQHResponse(BaseModel):
-    request_id: str
-    cognitive_state: CognitiveState  # Fixed typo: coginitive -> cognitive
-    requested_tool: Optional[list[str]] = []
+
 
 # ==================== ZERO-LATENCY CLEANER ====================
 def clean_pqh_response(raw_data: str, emotion: str = "neutral") -> PQHResponse:

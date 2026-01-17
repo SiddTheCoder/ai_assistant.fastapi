@@ -46,6 +46,7 @@ def initialize_client(user_id: str = "default_client") -> None:
     global _initialized, _execution_engine
     
     if _initialized and _execution_engine:
+        logger.info("⚠️ Client already initialized, skipping...")
         return
     
     logger.info("\n" + "="*70)
@@ -73,7 +74,7 @@ def initialize_client(user_id: str = "default_client") -> None:
         logger.info("="*70 + "\n")
         
     except Exception as e:
-        logger.error(f"❌ Initialization failed: {e}")
+        logger.error(f"❌ Initialization failed: {e}", exc_info=True)
         raise
 
 
@@ -104,7 +105,7 @@ async def receive_tasks_from_server(
     """
     # 1. Auto-init checks
     if not _initialized:
-        logger.info("⚠️  Client Core not initialized, initializing now...")
+        logger.info("⚠️ Client Core not initialized, initializing now...")
         initialize_client(user_id)
     
     engine = get_execution_engine()
@@ -124,13 +125,29 @@ async def receive_tasks_from_server(
         return
 
     if not tasks_to_process:
+        logger.warning("⚠️ No tasks to process")
         return
 
     logger.info(f"\n📨 [CLIENT API] Received {len(tasks_to_process)} task(s)")
+    for i, task_dict in enumerate(tasks_to_process, 1):
+        task_info = task_dict.get("task", {})
+        logger.info(f"   {i}. {task_info.get('task_id')}: {task_info.get('tool')}")
     
     # 4. Pass to engine
-    # TODO: [IPC] In future, if using IPC, acknowledge receipt back to host here
     await engine.receive_tasks(tasks_to_process)
+    
+    # 5. ✅ KEY FIX: Start processing loop if not already running
+    logger.info("🔄 [CLIENT API] Starting/ensuring execution loop is running...")
+    
+    # Check if engine has a method to start/ensure loop is running
+    # Assuming your engine has a `process_tasks()` or similar method
+    # If not, we need to trigger it here
+    
+    if hasattr(engine, 'start'):
+        asyncio.create_task(engine.start())
+    else:
+        # Fallback: trigger processing manually
+        logger.warning("⚠️ Engine doesn't have a start method, tasks may not execute")
 
 
 async def run_demo_tasks() -> None:
@@ -178,8 +195,7 @@ async def run_demo_tasks() -> None:
     
     await receive_tasks_from_server("demo_user", sample_tasks)
     
-    # Keep alive to allow execution completion if needed
-    # In real usage, the engine manages its own loop or the host process keeps running
+    # Keep alive to allow execution completion
     engine = get_execution_engine()
     await engine.wait_for_completion()
 

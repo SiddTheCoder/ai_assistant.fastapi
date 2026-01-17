@@ -160,8 +160,8 @@ class ClientExecutionEngine:
             if iteration >= max_iterations:
                 logger.warning("⚠️  Max iterations reached")
         
-        except Exception as e:
-            logger.error(f"❌ Execution loop error: {e}")
+        # except Exception as e:
+        #     logger.error(f"❌ Execution loop error: {e}")
         
         finally:
             self.running = False
