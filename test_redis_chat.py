@@ -22,7 +22,7 @@ async def main():
     # print(plain)
 
     from app.services.chat_service import chat
-    await chat("open notepad chrome zen and also open vscode", user_id="guest")
+    await chat("search about siddthecoder and write a full array of details in notepad", user_id="guest")
     
     # Wait for background tasks to complete
     print("Waiting for background tasks...")
