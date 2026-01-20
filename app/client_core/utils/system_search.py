@@ -36,6 +36,11 @@ APP_ALIASES = {
         "darwin": ["TextEdit"],
         "linux": ["gedit", "kate", "xed", "mousepad", "leafpad"]
     },
+    "whatsapp": {
+        "win32": ["WhatsApp", "WhatsApp"],
+        "darwin": ["WhatsApp"],
+        "linux": ["whatsapp-desktop", "whatsapp"]
+    },
     "textedit": {
         "win32": ["notepad"],
         "darwin": ["TextEdit"],

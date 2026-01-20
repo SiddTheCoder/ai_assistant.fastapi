@@ -6,7 +6,7 @@ import asyncio
 from app.config import settings
 from app.services import transcribe_audio
 from app.socket.socket_utils import emit_server_status
-from app.cache.load_user import load_user 
+from app.cache import load_user 
 from app.services.chat_service import chat
 from app.schemas.schemae import RequestTTS
 from app.helper import model_parser

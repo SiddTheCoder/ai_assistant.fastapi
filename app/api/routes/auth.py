@@ -1,7 +1,7 @@
 from fastapi.encoders import jsonable_encoder
 from typing import Any, Dict
 from fastapi import APIRouter, Body,Depends,  Query,Request
-from app.cache.redis.config import get_user_details, set_user_details, update_user_details
+from app.cache import get_user_details, set_user_details, update_user_details
 from app.db.mongo import get_db
 from app.utils.serialize_mongo_doc import serialize_doc
 from app.models.user_model import UserModel , UserResponse, UserUpdateQuery
@@ -276,7 +276,7 @@ async def login(request: Request, user: auth_schema.LoginData):
 # This route is for inserting api keys
 @router.post("/insert-api-keys")
 async def insert_keys(request:Request ,payload: auth_schema.APIKeys, user = Depends(get_current_user)):
-    from app.cache.redis.config import set_user_details
+    from app.cache import set_user_details
     db= get_db()
     print("user from middlware",user, "type of user",type(user))
     updated_user = await db.users.find_one_and_update(
@@ -443,7 +443,7 @@ async def get_users():
 
 @router.get("/load_user")
 async def test_load_user_from_redis(user_id: str):
-    from app.cache.load_user import load_user
+    from app.cache import load_user
     details = await load_user(user_id)
     await set_user_details("guest", details)
     redis_user = await get_user_details("guest")

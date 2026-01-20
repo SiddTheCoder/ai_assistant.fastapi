@@ -18,7 +18,9 @@ from app.registry.loader import load_tool_registry, get_tool_registry
 from app.core.orchestrator import init_orchestrator, get_orchestrator
 from app.core.execution_engine import init_execution_engine, get_execution_engine
 from app.core.server_executor import init_server_executor, get_server_executor
+# below both imports needed for task handling in client
 from app.socket.task_handler import register_task_events
+from app.core.task_emitter import get_task_emitter
 
 # Configure logging
 logging.basicConfig(
@@ -57,15 +59,19 @@ async def lifespan(app: FastAPI):
 
         # 5. Register WebSocket task handlers
         logger.info("📡 Registering WebSocket handlers...")
-        task_handler = await register_task_events(sio, connected_users)
-        
+        # real cleint emmiter ws
+        # task_handler = await register_task_events(sio, connected_users)
+        #  Add mock client emitter - mimicking task_handler behavior
+        mock_emitter = get_task_emitter()
+
+               
         # Initialize Execution Engine
         execution_engine = init_execution_engine()
         logger.info("Execution Engine initialized")
         
         # Wire them together
         execution_engine.set_server_executor(server_executor)
-        execution_engine.set_client_emitter(task_handler)
+        execution_engine.set_client_emitter(mock_emitter)
         logger.info("Components wired together")
         
     except Exception as e:

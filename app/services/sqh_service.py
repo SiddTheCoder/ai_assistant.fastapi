@@ -4,12 +4,16 @@ Handles Secondary Query Handler logic:
 1. Generates Task Plan using LLM
 2. Registers tasks with Orchestrator
 3. Triggers Execution Engine
+
+✅ UPDATED: Returns execution task for proper awaiting
 """
 
 import logging
 import json
 import asyncio
 from typing import List, Dict, Any
+
+from sympy import ask
 
 from app.core.models import LifecycleMessages, Task
 from app.models.pqh_response_model import PQHResponse
@@ -24,111 +28,106 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 async def process_sqh(
-    # pqh_response: PQHResponse,
-    # user_details: Dict[str, Any]
-) -> None:
+    pqh_response: PQHResponse,
+    user_details: Dict[str, Any]
+) -> asyncio.Task:
     """
     Process SQH in background:
     - Generate Plan
     - Register Tasks
     - Trigger Execution
+    
+    ✅ UPDATED: Returns the execution task so caller can await it
+    
+    Returns:
+        asyncio.Task: The execution engine task (can be awaited)
+    
+    Raises:
+        ValueError: If LLM response is invalid or parsing fails
+        RuntimeError: If task generation fails
+    
+    Example:
+        execution_task = await process_sqh(pqh_response, user_details)
+        await execution_task  # Wait for completion
     """
-    # user_id = user_details.get("id", "guest")
-    # # user_details['id'] might be ObjectId, ensure string
-    # if not isinstance(user_id, str):
-    #     user_id = str(user_id)
+    user_id = user_details.get("id", "guest")
+    # user_details['id'] might be ObjectId, ensure string
+    if not isinstance(user_id, str):
+        user_id = str(user_id)
 
-    # logger.info(f"🚀 [SQH] Starting background task generation for user: {user_id}")
+    logger.info(f"🚀 [SQH] Starting background task generation for user: {user_id}")
 
     try:
         # 1. Build Prompt
-        # prompt = build_sqh_prompt(pqh_response, user_details)
+        prompt = build_sqh_prompt(pqh_response, user_details)
         
-        # # 2. Call AI (Reasoning Model)
-        # provider_manager = ProviderManager(user_details)
+        # 2. Call AI (Reasoning Model)
+        provider_manager = ProviderManager(user_details)
         
-        # # Use a reasoning model or smart model for planning
-        # model_name = settings.openrouter_reasoning_model_name
+        # Use a reasoning model or smart model for planning
+        model_name = settings.openrouter_reasoning_model_name
         
-        # logger.info(f"🧠 [SQH] calling LLM ({model_name})...")
-        # raw_response, provider = await provider_manager.call_with_fallback(
-        #     prompt=prompt
-        # )
+        logger.info(f"🧠 [SQH] calling LLM ({model_name})...")
+        raw_response, provider = await provider_manager.call_with_fallback(
+            prompt=prompt
+        )
         
-        # if not raw_response:
-        #     logger.error("❌ [SQH] Empty response from LLM")
-        #     return
+        # ✅ FIX: Raise instead of return
+        if not raw_response:
+            error_msg = "Empty response from LLM"
+            logger.error(f"❌ [SQH] {error_msg}")
+            raise ValueError(error_msg)
         
-        # # 3. Parse Response
-        # try:
-        #     # Clean markdown code blocks if present
-        #     cleaned_json = raw_response.strip()
-        #     if cleaned_json.startswith("```json"):
-        #         cleaned_json = cleaned_json.split("\n", 1)[1]
-        #     if cleaned_json.endswith("```"):
-        #         cleaned_json = cleaned_json.rsplit("\n", 1)[0]
+        # 3. Parse Response
+        try:
+            # Clean markdown code blocks if present
+            cleaned_json = raw_response.strip()
+            if cleaned_json.startswith("```json"):
+                cleaned_json = cleaned_json.split("\n", 1)[1]
+            if cleaned_json.endswith("```"):
+                cleaned_json = cleaned_json.rsplit("\n", 1)[0]
             
-        #     data = json.loads(cleaned_json)
+            data = json.loads(cleaned_json)
             
-        #     # Handle both {"tasks": [...]} and [...] formats
-        #     if isinstance(data, list):
-        #         tasks_data = data
-        #     elif isinstance(data, dict):
-        #         tasks_data = data.get("tasks", [])
-        #     else:
-        #         logger.error(f"❌ [SQH] Invalid JSON format: {type(data)}")
-        #         return
+            # Handle both {"tasks": [...]} and [...] formats
+            if isinstance(data, list):
+                tasks_data = data
+            elif isinstance(data, dict):
+                tasks_data = data.get("tasks", [])
+            else:
+                # ✅ FIX: Raise instead of return
+                error_msg = f"Invalid JSON format: {type(data)}"
+                logger.error(f"❌ [SQH] {error_msg}")
+                raise ValueError(error_msg)
             
-        #     logger.info(f"SQH response:\n{json.dumps(tasks_data, indent=2)}")
-        #     # Parse into Task objects
-        #     tasks = [Task(**task_data) for task_data in tasks_data]
+            logger.info(f"SQH response:\n{json.dumps(tasks_data, indent=2)}")
+            # Parse into Task objects
+            tasks = [Task(**task_data) for task_data in tasks_data]
             
-        #     if not tasks:
-        #         logger.warning("⚠️ [SQH] No tasks generated by LLM")
-        #         return
+            # ✅ FIX: Raise instead of return
+            if not tasks:
+                error_msg = "No tasks generated by LLM"
+                logger.warning(f"⚠️ [SQH] {error_msg}")
+                raise ValueError(error_msg)
             
-        #     logger.info(f"📋 [SQH] Parsed {len(tasks)} tasks:")
-        #     for task in tasks:
-        #         logger.info(f"   - {task.task_id}: {task.tool} ({task.execution_target})")
+            logger.info(f"📋 [SQH] Parsed {len(tasks)} tasks:")
+            for task in tasks:
+                logger.info(f"   - {task.task_id}: {task.tool} ({task.execution_target})")
 
-        # except json.JSONDecodeError as e:
-        #     logger.error(f"❌ [SQH] JSON Parse Error: {e}")
-        #     logger.debug(f"Raw response: {raw_response}")
-        #     return
-        # except Exception as e:
-        #     logger.error(f"❌ [SQH] Task Validation Error: {e}")
-        #     return
-        
-        user_id = "guest"
-    
-        tasks = [
-            Task(
-                task_id="fetch_data",
-                tool="web_search",
-                execution_target="server",
-                depends_on=[],
-                inputs={"query": "latest AI research papers"},
-                lifecycle_messages=LifecycleMessages(
-                    on_start="📥 Fetching research data from web...",
-                    on_success="✅ Data fetched successfully"
-                )
-            ),
-            Task(
-                task_id="open_notepad",
-                tool="open_app",
-                execution_target="client",
-                depends_on=[],
-                inputs={"target": "notepad"},
-                input_bindings={
-                    "content": "$.tasks.step_1.output.data.query_demo" 
-                },
-                lifecycle_messages=LifecycleMessages(
-                    on_start="📁 Opening Notepad on client...",
-                    on_success="✅ Notepad opened successfully"
-                )
-            ),
-          
-        ]
+        except json.JSONDecodeError as e:
+            # ✅ FIX: Raise instead of return
+            error_msg = f"JSON Parse Error: {e}"
+            logger.error(f"❌ [SQH] {error_msg}")
+            logger.debug(f"Raw response: {raw_response}")
+            raise ValueError(error_msg) from e
+        except ValueError:
+            # Re-raise ValueError from above
+            raise
+        except Exception as e:
+            # ✅ FIX: Raise instead of return
+            error_msg = f"Task Validation Error: {e}"
+            logger.error(f"❌ [SQH] {error_msg}")
+            raise RuntimeError(error_msg) from e
 
         # 4. Register Tasks
         logger.info(f"📝 [SQH] Registering {len(tasks)} tasks with Orchestrator...")
@@ -150,17 +149,15 @@ async def process_sqh(
             client_emitter = get_task_emitter()
             execution_engine.set_client_emitter(client_emitter)
         
-        # 5. Trigger Execution Engine
+        # 6. Trigger Execution Engine and RETURN the task
         logger.info(f"⚡ [SQH] Starting execution for {len(tasks)} tasks...")
         engine_task = await execution_engine.start_execution(user_id)
-        await engine_task
-        
-        # 6. Get Summary
-        summary = await orchestrator.get_execution_summary(user_id)
-        logger.info(f"\n📊 Summary: {summary}")
-    
         
         logger.info(f"✅ [SQH] Execution workflow initiated for user: {user_id}")
+        
+        # ✅ RETURN the task so caller can await it
+        return engine_task
 
     except Exception as e:
         logger.error(f"❌ [SQH] Critical Failure: {e}", exc_info=True)
+        raise

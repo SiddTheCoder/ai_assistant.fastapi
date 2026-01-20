@@ -1,14 +1,14 @@
-from app.cache.redis.config import RedisManager 
+from app.cache import RedisManager 
 import asyncio
 import json
-from app.cache.load_user import load_user
+from app.cache import load_user
 from app.utils.format_context import format_context
 from app.registry.loader import load_tool_registry, get_tool_registry
 from app.tools.loader import load_all_tools
 
 async def main():
     config = RedisManager()
-    await config.initialize()
+    
     
     # await config.add_message("user123", "user", "Hello, World!")
     # await config.add_message("user123", "ai", "Hi there!")
@@ -22,7 +22,7 @@ async def main():
     # print(plain)
 
     from app.services.chat_service import chat
-    await chat("search about siddthecoder and write a full array of details in notepad", user_id="guest")
+    await chat("open notepad", user_id="guest")
     
     # Wait for background tasks to complete
     print("Waiting for background tasks...")

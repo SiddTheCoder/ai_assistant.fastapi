@@ -8,6 +8,8 @@ This is the continuous loop that:
 3. Executes server tasks in parallel
 4. Emits client tasks via WebSocket
 5. Waits for completion and loops
+
+✅ NEW: Event-based completion signaling for proper async waiting
 """
 
 import asyncio
@@ -28,6 +30,8 @@ class ExecutionEngine:
     
     Each user gets their own engine instance when they send a message
     Engine lives until all tasks are complete or timeout
+    
+    ✅ NEW: Supports waiting for completion via events
     """
     
     def __init__(self):
@@ -36,6 +40,9 @@ class ExecutionEngine:
         
         # Track running engines per user
         self.running_engines: Dict[str, asyncio.Task] = {}
+        
+        # ✅ NEW: Completion events for awaiting execution
+        self.completion_events: Dict[str, asyncio.Event] = {}
         
         # Tool executors (will be injected)
         self.server_tool_executor = None
@@ -57,7 +64,12 @@ class ExecutionEngine:
         
         This is called after orchestrator.register_tasks()
         Creates a background task that runs the execution loop
+        
+        ✅ NEW: Creates completion event for this user
         """
+        # ✅ Create completion event BEFORE starting
+        self.completion_events[user_id] = asyncio.Event()
+        
         # Check if already running for this user
         if user_id in self.running_engines:
             existing = self.running_engines[user_id]
@@ -75,11 +87,51 @@ class ExecutionEngine:
 
         return task
     
+    async def wait_for_completion(self, user_id: str, timeout: float = 30) -> bool:
+        """
+        ✅ NEW: Wait for execution to complete with timeout
+        
+        Args:
+            user_id: User identifier
+            timeout: Max seconds to wait (default 30)
+            
+        Returns:
+            True if completed successfully, False if timeout
+            
+        Example:
+            engine = get_execution_engine()
+            await engine.start_execution(user_id)
+            success = await engine.wait_for_completion(user_id, timeout=60)
+        """
+        if user_id not in self.completion_events:
+            logger.warning(f"⚠️  No execution running for {user_id}")
+            return False
+        
+        try:
+            logger.info(f"⏳ Waiting for execution to complete (timeout: {timeout}s)...")
+            await asyncio.wait_for(
+                self.completion_events[user_id].wait(),
+                timeout=timeout
+            )
+            logger.info(f"✅ Execution completed for {user_id}")
+            return True
+            
+        except asyncio.TimeoutError:
+            logger.warning(f"⏰ Timeout waiting for {user_id} execution after {timeout}s")
+            return False
+            
+        finally:
+            # Cleanup event after waiting
+            if user_id in self.completion_events:
+                del self.completion_events[user_id]
+    
     async def _execution_loop(self, user_id: str) -> None:
         """
         Main execution loop for a user
         
         This runs continuously until all tasks are done or timeout
+        
+        ✅ NEW: Signals completion event when done
         """
         logger.info(f"\n{'='*70}")
         logger.info(f"🔥 EXECUTION LOOP STARTED: {user_id}")
@@ -161,6 +213,11 @@ class ExecutionEngine:
             
             # Print final summary
             await self._print_final_summary(user_id)
+            
+            # ✅ NEW: Signal completion event
+            if user_id in self.completion_events:
+                self.completion_events[user_id].set()
+                logger.info(f"📢 Completion event signaled for {user_id}")
             
             logger.info(f"\n{'='*70}")
             logger.info(f"🏁 EXECUTION LOOP ENDED: {user_id}")

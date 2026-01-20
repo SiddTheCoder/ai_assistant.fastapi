@@ -1,11 +1,11 @@
 from app.utils import  clean_pqh_response
 from app.models.pqh_response_model import CognitiveState, PQHResponse
-from app.cache.load_user import load_user 
+from app.cache import load_user 
 from app.ai.providers.manager import ProviderManager
 from typing import Optional
 from app.config import settings
 # from app.services.detect_emotion import detect_emotion
-from app.cache.redis.config import get_last_n_messages,process_query_and_get_context,add_message as redis_add_message
+from app.cache import get_last_n_messages,process_query_and_get_context,add_message as redis_add_message
 from app.prompts import pqh_prompt
 from app.registry.tool_index import get_tools_index
 import json
@@ -19,17 +19,26 @@ logger = logging.getLogger(__name__)
 async def chat(
     query: str,
     user_id: str = "guest",
-    model_name: Optional[str] = None
+    model_name: Optional[str] = None,
+    wait_for_execution: bool = False,  # ✅ NEW: Option to wait for tasks
+    execution_timeout: float = 30.0     # ✅ NEW: Timeout for execution
 ) -> PQHResponse:
     """
     Main entry point for the chat service as PQH - Primary Query Handler.
+    
     Args:
         query: User's message
         user_id: User identifier
         model_name: Optional model name for OpenRouter fallback
+        wait_for_execution: If True, waits for task execution to complete (default: False)
+        execution_timeout: Max seconds to wait for execution (default: 30)
     
     Returns:
         clean_pqh_response.PQHResponse: Structured response from the AI
+        
+    Note:
+        In production (web server), keep wait_for_execution=False for async behavior.
+        In testing/CLI, set wait_for_execution=True to ensure tasks complete.
     """
     if not query or not query.strip():
         return _create_error_response("Empty query received", "neutral")
@@ -116,9 +125,20 @@ async def chat(
         # --- Step 7: Trigger SQH in Background (if tools needed) ---
         if cleaned_response.requested_tool and len(cleaned_response.requested_tool) > 0:
             logger.info("🔧 Tools requested by PQH. Triggering SQH in background...")
-            asyncio.create_task(
-                process_sqh(cleaned_response, user_details)
-            )
+            
+            # ✅ NEW: Option to wait for execution completion
+            if wait_for_execution:
+                await _execute_and_wait(
+                    cleaned_response=cleaned_response,
+                    user_details=user_details,
+                    user_id=user_id,
+                    timeout=execution_timeout
+                )
+            else:
+                # Original behavior: fire-and-forget
+                asyncio.create_task(
+                    process_sqh(cleaned_response, user_details)
+                )
         
         return cleaned_response
     
@@ -126,6 +146,47 @@ async def chat(
         logger.error(f"❌ Chat service error: {e}", exc_info=True)
         error_message = str(e) if str(e) else "Sorry, I'm having trouble processing your request."
         return _create_error_response(error_message, "neutral", query)
+
+
+async def _execute_and_wait(
+    cleaned_response: PQHResponse,
+    user_details: dict,
+    user_id: str,
+    timeout: float = 30.0
+) -> None:
+    """
+    ✅ NEW: Execute tasks and wait for completion with timeout
+    
+    This is used when wait_for_execution=True in chat()
+    Ensures all tasks complete before returning
+    
+    Args:
+        cleaned_response: PQH response with tool requests
+        user_details: User information
+        user_id: User identifier
+        timeout: Max seconds to wait
+    """
+    from app.core.execution_engine import get_execution_engine
+    
+    try:
+        logger.info(f"⏳ Starting execution and waiting (timeout: {timeout}s)...")
+        
+        # Start execution and get the task
+        execution_task = await process_sqh(cleaned_response, user_details)
+        
+        # Wait for completion with timeout
+        engine = get_execution_engine()
+        success = await engine.wait_for_completion(user_id, timeout=timeout)
+        
+        if success:
+            logger.info(f"✅ Task execution completed for user: {user_id}")
+        else:
+            logger.warning(f"⏰ Task execution timed out after {timeout}s for user: {user_id}")
+            
+    except asyncio.TimeoutError:
+        logger.error(f"❌ Execution timeout after {timeout}s for user: {user_id}")
+    except Exception as e:
+        logger.error(f"❌ Error during task execution: {e}", exc_info=True)
 
     
 
