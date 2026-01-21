@@ -178,32 +178,15 @@ async def scenario_system_tools():
     initialize_client(user_id)
     engine = get_execution_engine()
     
-    import sys
-    # We now test the aliasing: "notepad" should work on Mac/Linux too!
-    target_app = "notepad"
     
     tasks = [
         {
             "task": {
-                "task_id": "open_app_1",
+                "task_id": "task1",
                 "tool": "open_app",
                 "execution_target": "client",
                 "depends_on": [],
-                "inputs": {"target": target_app},
-                "lifecycle_messages": {
-                    "on_start": f"Opening {target_app}...",
-                    "on_success": f"{target_app} opened"
-                }
-            },
-            "status": "emitted"
-        },
-        {
-            "task": {
-                "task_id": "opem",
-                "tool": "open_app",
-                "execution_target": "client",
-                "depends_on": ["open_app_1"],
-                "inputs": {"target": "camera"},
+                "inputs": {"target": "whatsapp"},
                 "lifecycle_messages": {
                     "on_start": "Closing Notepad...",
                     "on_success": "Notepad closed"
