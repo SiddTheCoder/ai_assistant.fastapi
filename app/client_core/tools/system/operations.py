@@ -1,84 +1,101 @@
 """
-System control tools (Open/Close App).
+System control tools (Open/Close App) with URL support.
 """
 
 import os
 import sys
 import subprocess
-import logging
-from typing import Dict, Any
-
-from ..base import BaseTool, ToolOutput
-from ...utils.system_search import SystemSearcher
-
-"""
-Updated OpenAppTool with full Windows Store app support.
-"""
-
-import os
-import sys
-import subprocess
+import webbrowser
 import logging
 from typing import Dict, Any
 from datetime import datetime
 
+from ..base import BaseTool, ToolOutput
+from ...utils.app_searcher import AppSearcher
+from ...utils.app_resolver import AppResolver
+
 
 class OpenAppTool(BaseTool):
-    """Open application tool with support for all app types."""
+    """Open application or URL with support for all types."""
     
     def get_tool_name(self) -> str:
         return "open_app"
     
     def __init__(self):
         super().__init__()
-        self.searcher = SystemSearcher()
+        self.searcher = AppSearcher()
+        self.resolver = AppResolver(self.searcher)
     
     async def _execute(self, inputs: Dict[str, Any]) -> ToolOutput:
-        """Find and open an application."""
+        """Find and open an application or URL."""
         target = inputs.get("target", "")
         print("OPEN APP TOOL TARGET:", target)
         args = inputs.get("args", [])
         
         if not target:
-            return ToolOutput(success=False, data={}, error="Target app name is required")
+            return ToolOutput(success=False, data={}, error="Target app name or URL is required")
             
         try:
-            # 1. Find the app
-            app_path = self.searcher.find_app(target)
+            # 1. Resolve target (system app OR URL)
+            resolved_path, resolve_type = self.resolver.resolve(target)
             
-            if not app_path:
+            if not resolved_path:
                 return ToolOutput(
                     success=False, 
                     data={}, 
-                    error=f"Application '{target}' not found in your system boss"
+                    error=f"Could not resolve '{target}' to an app or URL"
                 )
-                
-            self.logger.info(f"Opening app at: {app_path}")
             
-            # 2. Launch it based on OS and app type
+            self.logger.info(f"Resolved '{target}' → {resolve_type}: {resolved_path}")
+            
+            # 2. Launch based on type
             process_id = 0
-            
-            if sys.platform == "win32":
-                process_id = self._launch_windows_app(app_path, args)
-            elif sys.platform == "darwin":
-                self._launch_macos_app(app_path, args)
-            else:
-                self._launch_linux_app(app_path, args)
+            if resolve_type == "system_app":
+                process_id = self._launch_system_app(resolved_path, args)
+                status = "launched"
+            else:  # URL or website
+                self._launch_url(resolved_path)
+                status = "opened_in_browser"
             
             return ToolOutput(
                 success=True,
                 data={
                     "target": target,
-                    "path": app_path,
+                    "resolved_to": resolved_path,
+                    "type": resolve_type,
                     "process_id": process_id,
                     "launch_time": datetime.now().isoformat(),
-                    "status": "launched"
+                    "status": status
                 }
             )
             
         except Exception as e:
-            self.logger.error(f"Failed to open app: {e}")
+            self.logger.error(f"Failed to open '{target}': {e}")
             return ToolOutput(success=False, data={}, error=str(e))
+    
+    def _launch_system_app(self, app_path: str, args: list) -> int:
+        """
+        Launch system-installed application.
+        Returns process ID or 0.
+        """
+        self.logger.info(f"Launching system app: {app_path}")
+        
+        if sys.platform == "win32":
+            return self._launch_windows_app(app_path, args)
+        elif sys.platform == "darwin":
+            self._launch_macos_app(app_path, args)
+            return 0
+        else:
+            self._launch_linux_app(app_path, args)
+            return 0
+    
+    def _launch_url(self, url: str):
+        """
+        Open URL in default browser.
+        Cross-platform using webbrowser module.
+        """
+        self.logger.info(f"Opening URL in default browser: {url}")
+        webbrowser.open(url)
     
     def _launch_windows_app(self, app_path: str, args: list) -> int:
         """
@@ -139,6 +156,7 @@ class OpenAppTool(BaseTool):
             cmd = [app_path] + args
             subprocess.Popen(cmd)
 
+
 class CloseAppTool(BaseTool):
     """Close application tool."""
     
@@ -147,8 +165,6 @@ class CloseAppTool(BaseTool):
     
     async def _execute(self, inputs: Dict[str, Any]) -> ToolOutput:
         """Close/Kill an application."""
-        from datetime import datetime
-        
         target = inputs.get("target", "")
         force = inputs.get("force", False)
         

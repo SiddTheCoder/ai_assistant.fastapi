@@ -1,4 +1,4 @@
-from app.client_core.utils.system_search import SystemSearcher
+from app.client_core.utils.app_searcher import SystemSearcher
 import json
 
 searcher = SystemSearcher()

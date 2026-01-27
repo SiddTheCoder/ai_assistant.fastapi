@@ -16,7 +16,16 @@ import time
 logger = logging.getLogger(__name__)
 
 
-class SystemSearcher:
+# CRITICAL: Known protocol handlers that must take precedence
+# These are NOT found by file scanning but are valid Windows launch methods
+PROTOCOL_HANDLERS = {
+    "camera": "microsoft.windows.camera:",
+    "calculator": "calculator:",
+    "settings": "ms-settings:",
+}
+
+
+class AppSearcher:
     """
     Dynamic system-wide application searcher.
     No hardcoded apps - discovers everything automatically.
@@ -41,11 +50,19 @@ class SystemSearcher:
         """
         self.logger.info(f"Searching for: '{query}' on {self.os_type}")
         
-        # Refresh cache if expired
+        # 1. FIRST: Check protocol handlers (Windows UWP apps)
+        if self.os_type == "win32":
+            query_lower = query.lower()
+            if query_lower in PROTOCOL_HANDLERS:
+                protocol = PROTOCOL_HANDLERS[query_lower]
+                self.logger.info(f"Using protocol handler: {protocol}")
+                return protocol
+        
+        # 2. Refresh cache if expired
         if time.time() - self._cache_timestamp > self._cache_ttl:
             self._refresh_cache()
         
-        # Search in cache
+        # 3. Search in cache
         matches = self._fuzzy_search_apps(query)
         
         if matches:
@@ -85,7 +102,7 @@ class SystemSearcher:
             (os.environ.get("PROGRAMFILES", "C:\\Program Files"), [".exe"]),
             (os.environ.get("PROGRAMFILES(X86)", "C:\\Program Files (x86)"), [".exe"]),
             
-            # System32
+            # System32 - BUT EXCLUDE KNOWN SETTINGS/UI HOSTS
             (os.path.join(os.environ.get("SYSTEMROOT", "C:\\Windows"), "System32"), [".exe"]),
             
             # User local apps
@@ -213,6 +230,13 @@ class SystemSearcher:
             extensions: List of file extensions to look for (e.g., [".exe", ".lnk"])
             max_depth: Maximum recursion depth
         """
+        # Blacklist: Executables that are NOT actual apps (just settings/helpers)
+        BLACKLIST = [
+            "camerasettingsuihost.exe",  # Camera settings UI, not the camera app
+            "systemsettings.exe",        # Settings UI host
+            "applicationframehost.exe",  # UWP container
+        ]
+        
         try:
             for root, dirs, files in os.walk(path):
                 # Depth limiting
@@ -228,6 +252,10 @@ class SystemSearcher:
                     
                     # Skip if no extension filter and not executable
                     if not extensions and not os.access(os.path.join(root, file), os.X_OK):
+                        continue
+                    
+                    # Skip blacklisted files
+                    if file.lower() in BLACKLIST:
                         continue
                     
                     # Extract clean name
