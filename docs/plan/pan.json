@@ -118,7 +118,7 @@ This is PHASE 0–2 Jarvis “working skeleton”.
 
 
 {
-  "userQuery": "Open YouTube and WhatsApp",
+  "user_query": "Open YouTube and WhatsApp",
   "plan": [
     {
       "tool_name": "open_app",
@@ -239,7 +239,7 @@ This is PHASE 0–2 Jarvis “working skeleton”.
 {
   "request_id": "unique_id_per_user_query",
   "cognitive_state": {
-    "userQuery": "EXACT user input",
+    "user_query": "EXACT user input",
     "emotion": "happy|concerned|neutral",
     "thought_process": "Gemini's internal reasoning for the plan (optional but helpful for debugging)",
     "answer": "A concise natural language response to the user."

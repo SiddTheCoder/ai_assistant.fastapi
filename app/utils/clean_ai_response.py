@@ -43,9 +43,9 @@ def clean_ai_response(raw_data: str) -> ChatResponse:
                 pass
         
         # Extract required fields
-        user_query = data.get("userQuery", "").strip()
+        user_query = data.get("user_query", "").strip()
         answer = data.get("answer", "").strip().replace("\\n", "\n")
-        answer_english = data.get("answerEnglish", "").strip().replace("\\n", "\n")
+        answer_english = data.get("answer_english", "").strip().replace("\\n", "\n")
         action_msg = data.get("actionCompletedMessage", "").strip()
         action_msg_en = data.get("actionCompletedMessageEnglish", "").strip()
         action = data.get("action", "").strip()
@@ -66,9 +66,9 @@ def clean_ai_response(raw_data: str) -> ChatResponse:
         
         # Build validated response
         cleaned = ChatResponse(
-            userQuery=user_query,
+            user_query=user_query,
             answer=answer,
-            answerEnglish=answer_english,
+            answer_english=answer_english,
             actionCompletedMessage=action_msg,
             actionCompletedMessageEnglish=action_msg_en,
             action=action,
@@ -111,9 +111,9 @@ def _parse_action_details(data: dict) -> ActionDetails:
 def _create_fallback_response(raw_data: str) -> ChatResponse:
     """Create safe fallback when parsing fails."""
     return ChatResponse(
-        userQuery="[Parse Error]",
+        user_query="[Parse Error]",
         answer=raw_data.strip()[:200] if raw_data else "Response processing failed.",
-        answerEnglish="Unable to process response.",
+        answer_english="Unable to process response.",
         actionCompletedMessage="",
         actionCompletedMessageEnglish="",
         action="",

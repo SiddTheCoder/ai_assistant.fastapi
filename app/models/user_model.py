@@ -3,9 +3,10 @@ from bson import ObjectId
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from pydantic import EmailStr
+from . import CamelModel
 
 # Base model with ALL fields (for internal use/database)
-class UserModel(BaseModel):
+class UserModel(CamelModel):
     username: Optional[str] = None
     email: Optional[EmailStr] = None
 
@@ -57,9 +58,6 @@ class UserModel(BaseModel):
     # --- Misc ---
     custom_attributes: Dict[str, Any] = Field(default_factory=dict)
 
-    class Config:
-        populate_by_name = True
-
 # update user model
 class UserUpdateQuery(BaseModel):
     username: Optional[str] = None
@@ -87,12 +85,9 @@ class UserUpdateQuery(BaseModel):
 
     custom_attributes: Optional[Dict[str, Any]] = None
 
-    class Config:
-        populate_by_name = True
-
 
 # Response model for API endpoints (excludes sensitive data)
-class UserResponse(BaseModel):
+class UserResponse(CamelModel):
     id: str = Field(..., alias="_id")
     username: Optional[str] = None
     email: Optional[EmailStr] = None
@@ -140,16 +135,10 @@ class UserResponse(BaseModel):
         if isinstance(v, ObjectId):
             return str(v)
         return v
-
-    class Config:
-        populate_by_name = True
 # Minimal response for list endpoints or when you need less data
-class UserMinimalResponse(BaseModel):
+class UserMinimalResponse(CamelModel):
     id: str = Field(..., alias="_id")
     username: Optional[str] = None
     email: Optional[EmailStr] = None
     theme: str = "light"
     language: str = "en"
-
-    class Config:
-        populate_by_name = True

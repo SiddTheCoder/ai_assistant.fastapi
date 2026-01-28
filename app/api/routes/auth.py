@@ -441,12 +441,38 @@ async def get_users():
     print("users", res)
     return res
 
-@router.get("/load_user")
+@router.get("/load_user", response_model=UserResponse)
 async def test_load_user_from_redis(user_id: str):
     from app.cache import load_user
     details = await load_user(user_id)
-    await set_user_details("guest", details)
-    redis_user = await get_user_details("guest")
-    updated_user = await update_user_details("guest", {"ai_gender": "male", "language": "hi", "is_gemini_api_quota_reached": False})
-    print("details", details, "redis_user", redis_user, "updated_user", updated_user)
-    return details
+    if not details:
+        # Return empty response for not found
+        return UserResponse(
+            _id="",
+            username=None,
+            email=None,
+            created_at=datetime.now(),
+            last_login=None,
+            last_active_at=None,
+            is_user_verified=False,
+            is_gemini_api_quota_reached=False,
+            is_openrouter_api_quota_reached=False,
+            accepts_promotional_emails=False,
+            language="en",
+            ai_gender="male",
+            theme="light",
+            notifications_enabled=True,
+            categories_of_interest=[],
+            favorite_brands=[],
+            liked_items=[],
+            disliked_items=[],
+            activity_habits={},
+            behavioral_tags=[],
+            personal_memories=[],
+            reminders=[],
+            preferences_history=[],
+            custom_attributes={}
+        )
+    # Convert the dict to UserResponse model for camelCase serialization
+    user_response = UserResponse(**details)
+    return user_response

@@ -85,11 +85,11 @@ def _reconstruct_pqh_response(raw_data: str, emotion: str) -> PQHResponse:
         # Extract cognitive_state
         cog_state = data.get("cognitive_state", {})
         cognitive_state = CognitiveState(
-            userQuery=cog_state.get("userQuery", "[Parse Error]"),
+            user_query=cog_state.get("user_query", "[Parse Error]"),
             emotion=cog_state.get("emotion", emotion),
             thought_process=cog_state.get("thought_process", "Response parsing failed"),
             answer=cog_state.get("answer", raw_data[:200] if raw_data else "Unable to process response."),
-            answerEnglish=cog_state.get("answerEnglish", "Unable to process response.")
+            answer_english=cog_state.get("answer_english", "Unable to process response.")
         )
         
         # Extract requested_tool
@@ -116,11 +116,11 @@ def _create_error_pqh_response(raw_data: str, emotion: str) -> PQHResponse:
     return PQHResponse(
         request_id=f"error_{int(time.time()*1000)}",
         cognitive_state=CognitiveState(
-            userQuery="[Parse Error]",
+            user_query="[Parse Error]",
             emotion=emotion,
             thought_process="Failed to parse AI response. All validation paths exhausted.",
             answer=raw_data[:200] if raw_data else "Response processing failed.",
-            answerEnglish="Unable to process response. Please try again."
+            answer_english="Unable to process response. Please try again."
         ),
         requested_tool=[]
     )
@@ -150,7 +150,7 @@ def is_valid_pqh_format(raw_data: str) -> bool:
         
         # Check cognitive_state structure
         cog_state = data.get("cognitive_state", {})
-        required_cog_keys = ["userQuery", "emotion", "thought_process", "answer", "answerEnglish"]
+        required_cog_keys = ["user_query", "emotion", "thought_process", "answer", "answer_english"]
         
         if not all(k in cog_state for k in required_cog_keys):
             return False

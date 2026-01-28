@@ -41,7 +41,7 @@ def build_sqh_prompt(
     
     # 1. Extract context from PQH (Using Pydantic model access)
     c_state = pqh_response.cognitive_state
-    user_query = c_state.userQuery
+    user_query = c_state.user_query
     thought_process = c_state.thought_process
     pqh_answer = c_state.answer
     tool_names = pqh_response.requested_tool or []

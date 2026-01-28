@@ -45,7 +45,7 @@ async def main():
         execution_timeout=30.0       # ✅ Max 30 seconds
     )
     
-    logger.info(f"💬 AI Response: {response.cognitive_state.answerEnglish}")
+    logger.info(f"💬 AI Response: {response.cognitive_state.answer_english}")
     logger.info(f"🔧 Tools Requested: {response.requested_tool}")
     logger.info("✅ Chat completed (with execution)!\n")
     

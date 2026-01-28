@@ -31,9 +31,9 @@ class ChatRequest(BaseModel):
     user_id : str = "guest"
 
 class ChatResponse(BaseModel):
-    userQuery: str  # Stores original user text
+    user_query: str  # Stores original user text
     answer: str  # Hindi response
-    answerEnglish: str  # English version of answer
+    answer_english: str  # English version of answer
     actionCompletedMessage: str  # Hindi action completion message
     actionCompletedMessageEnglish: str  # English version
     action: str = ""

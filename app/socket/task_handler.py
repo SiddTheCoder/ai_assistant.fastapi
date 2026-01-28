@@ -22,6 +22,9 @@ class SocketTaskHandler:
     
     Emits complete TaskRecord to client - client orchestrator 
     has same level of access as server orchestrator
+    
+    ✅ Always sends tasks as array with user_id (consistent interface)
+    ✅ Enriches with server-side dependency completion info
     """
     
     def __init__(self, sio: socketio.AsyncServer, connected_users: Dict[str, set]):
@@ -33,8 +36,8 @@ class SocketTaskHandler:
         """
         Emit single task to client
         
-        ✅ Sends COMPLETE TaskRecord as JSON
-        Client deserializes into its own TaskRecord model
+        ✅ Always sends as array with user_id for consistent interface
+        ✅ Enriches with server-side dependency completion info
         """
         # Check if user is connected
         if user_id not in self.connected_users or not self.connected_users[user_id]:
@@ -45,9 +48,17 @@ class SocketTaskHandler:
         sid = next(iter(self.connected_users[user_id]))
         
         try:
-            # ✅ Send ENTIRE TaskRecord as JSON
-            # Client gets same data as server orchestrator!
-            payload = task.model_dump(mode='json')
+            # Serialize to JSON dict
+            task_dict = task.model_dump(mode='json')
+            
+            # ✅ Enrich with server-side dependency state
+            task_dict = self._enrich_with_server_state(user_id, task_dict)
+            
+            # ✅ Always send as array with user_id
+            payload = {
+                "user_id": user_id,
+                "tasks": [task_dict]  # Single task in array
+            }
             
             # Emit to client
             await self.sio.emit(
@@ -71,6 +82,7 @@ class SocketTaskHandler:
         Emit batch of tasks to client (for chains)
         
         ✅ Client receives entire chain and handles dependencies locally
+        ✅ Enriches each task with server-side dependency state
         This is MUCH faster than individual emissions!
         """
         # Check if user is connected
@@ -81,10 +93,16 @@ class SocketTaskHandler:
         sid = next(iter(self.connected_users[user_id]))
         
         try:
-            # ✅ Send array of complete TaskRecords
+            # Serialize all to JSON dicts
+            task_dicts = [task.model_dump(mode='json') for task in tasks]
+            
+            # ✅ Enrich with server-side dependency state
+            task_dicts = [self._enrich_with_server_state(user_id, td) for td in task_dicts]
+            
+            # ✅ Send as array with user_id (consistent interface)
             payload = {
-                "tasks": [task.model_dump(mode='json') for task in tasks],
-                "is_chain": True  # Signal to client this is a dependency chain
+                "user_id": user_id,
+                "tasks": task_dicts
             }
             
             # Emit to client
@@ -104,6 +122,43 @@ class SocketTaskHandler:
         except Exception as e:
             logger.error(f"❌ Failed to emit batch: {e}")
             return False
+    
+    def _enrich_with_server_state(self, user_id: str, task_dict: dict) -> dict:
+        """
+        Enrich task dict with server-side dependency completion info.
+        
+        For tasks being sent to client, we need to include info about
+        which dependencies were already completed on the server side.
+        
+        Args:
+            user_id: User ID
+            task_dict: Task dictionary to enrich
+            
+        Returns:
+            Enriched task dictionary with 'server_completed_dependencies' field
+        """
+        state = self.orchestrator.get_state(user_id)
+        if not state:
+            return task_dict
+        
+        # Get the task's dependencies
+        depends_on = task_dict.get('task', {}).get('depends_on', [])
+        if not depends_on:
+            return task_dict
+        
+        # Check which dependencies are completed on server
+        completed_deps = []
+        for dep_id in depends_on:
+            dep_task = state.get_task(dep_id)
+            if dep_task and dep_task.status == "completed":
+                completed_deps.append(dep_id)
+        
+        # Add metadata about completed dependencies
+        if completed_deps:
+            task_dict['server_completed_dependencies'] = completed_deps
+            logger.info(f"   📊 Task {task_dict.get('task_id')} has {len(completed_deps)} server-completed deps: {completed_deps}")
+        
+        return task_dict
     
     async def handle_task_result(
         self, 

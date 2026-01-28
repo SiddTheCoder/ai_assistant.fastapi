@@ -36,11 +36,11 @@ if __name__ == "__main__":
 # {
 #   "request_id": "20260117_082700_001",
 #   "cognitive_state": {
-#     "userQuery": "Lets do some code open vscode and also write something related to AI in notepad",
+#     "user_query": "Lets do some code open vscode and also write something related to AI in notepad",
 #     "emotion": "neutral",
 #     "thought_process": "The user wants to open VS Code and write something about AI in Notepad. This requires two app launches and one file creation. I need to use 'open_app' for VS Code, 'open_app' for Notepad, and 'file_create' to put content in Notepad. No special date today. Emotion is neutral.",
 #     "answer": "Alright, opening VS Code for you. And I'll open Notepad to write something about AI.",
-#     "answerEnglish": "Alright, opening VS Code for you. And I'll open Notepad to write something about AI."
+#     "answer_english": "Alright, opening VS Code for you. And I'll open Notepad to write something about AI."
 #   },
 #   "requested_tool": [
 #     "open_app",

@@ -109,7 +109,7 @@ async def chat(
             redis_add_message(
                 user_id=user_id,
                 role="ai",
-                content=cleaned_response.cognitive_state.answerEnglish
+                content=cleaned_response.cognitive_state.answer_english
             )
         )
         # Add chat message to MongoDB asynchronously
@@ -118,7 +118,7 @@ async def chat(
             ChatController(
                 user_id=user_id,
                 user_query=query,
-                ai_response=cleaned_response.cognitive_state.answerEnglish
+                ai_response=cleaned_response.cognitive_state.answer_english
             )
         ))
 
@@ -196,11 +196,11 @@ def _create_error_response(message: str, emotion: str, query: str = "") -> PQHRe
     return PQHResponse(
        request_id="error_response",
        cognitive_state=CognitiveState(
-              userQuery=query,
+              user_query=query,
               emotion=emotion,
               thought_process="Error occurred while processing the request.",
               answer=message,
-              answerEnglish=message
+              answer_english=message
          ),
          requested_tool=[]
     )

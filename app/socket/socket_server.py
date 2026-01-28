@@ -310,6 +310,10 @@ async def send_user_voice_query(sid, data):
             # ✅ Use session user_id (not from client payload)
             chat_res = await chat(text, user_id)  # type: ignore
             dict_data = await serialize_response(chat_res)
+
+            # also emit the tts response
+
+            # await request_tts(sid, )
             
             await sio.emit("query-result", {
                 "result": text,
